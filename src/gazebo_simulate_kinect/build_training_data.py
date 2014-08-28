@@ -11,6 +11,7 @@ import numpy as np
 import os
 from time import sleep
 import matplotlib.pyplot as plt
+import sys
 
 import tf_conversions
 import xyz_to_pixel_loc
@@ -201,7 +202,7 @@ def get_model_grasps(model_name):
 
     grasps = []
 
-    graspfilepath = rospack.get_path('training_grasps') + "/grasps/" + model_name
+    graspfilepath = os.path.expanduser("~/grasp_deep_learning/data/grasps/" + model_name)
     for graspfile in  os.listdir(graspfilepath):
         new_grasps = graspfilepath_to_grasps(graspfilepath + "/" + graspfile)
         for grasp in new_grasps:
@@ -244,9 +245,9 @@ def graspfilepath_to_grasps(graspfilepath):
 
 def gen_model_pose(model_orientation):
     model_pose = Pose()
-    model_pose.position.x = 2 + random.uniform(-.25,.25)
-    model_pose.position.y = 0.0 + random.uniform(-.25,.25)
-    model_pose.position.z = 1 + random.uniform(-.25,.25)
+    model_pose.position.x = 2 + random.uniform(-.25, .25)
+    model_pose.position.y = 0.0 + random.uniform(-.25, .25)
+    model_pose.position.z = 1 + random.uniform(-.25, .25)
 
     roll = model_orientation[0]
     pitch = model_orientation[1]
@@ -262,7 +263,7 @@ def gen_model_pose(model_orientation):
 
 if __name__ == '__main__':
 
-    output_image_dir = "rgbd_images/"
+    output_image_dir = os.path.expanduser("~/grasp_deep_learning/data/rgbd_images/")
     models_dir = GRASPABLE_MODEL_PATH
 
     kinect_manager = GazeboKinectManager()
@@ -283,6 +284,10 @@ if __name__ == '__main__':
 
     for model_name in ['coke_can']:
 
+        model_output_image_dir = output_image_dir + model_name + '/'
+        if not os.path.exists(model_output_image_dir):
+            os.makedirs(model_output_image_dir)
+
         model_manager.spawn_model(model_name)
 
         transformer = tf.TransformerROS(True, rospy.Duration(10.0))
@@ -290,7 +295,7 @@ if __name__ == '__main__':
         camera_pose_in_world_frame = model_manager.get_model_state(kinect_manager.camera_name).pose
         add_transform(camera_pose_in_world_frame, "World", "Camera", transformer)
 
-        dataset = h5py.File(output_image_dir + "rgbd_and_labels.h5")
+        dataset = h5py.File(model_output_image_dir + "rgbd_and_labels.h5")
         num_images = len(model_orientations)
 
         dataset.create_dataset("rgbd", (num_images, 480, 640, 4), chunks=(10, 480, 640, 4))
@@ -335,12 +340,16 @@ if __name__ == '__main__':
                 overlay[u-2:u+2, v-2:v+2] = model_grasp.energy
                 grasp_points[u, v] = model_grasp.energy
 
-            output_filepath = output_image_dir + model_name + "_" + str(index)
+            output_filepath = model_output_image_dir + model_name + "_" + str(index)
             if not os.path.exists(output_filepath):
                 os.makedirs(output_filepath)
 
             #fix nans in depth
-            rgbd_image[:, :, 3] = np.nan_to_num(rgbd_image[:, :, 3])
+            max_depth = np.nan_to_num(rgbd_image[:, :, 3]).max()*1.3
+            for x in range(rgbd_image.shape[0]):
+                for y in range(rgbd_image.shape[1]):
+                    if rgbd_image[x, y, 3] != rgbd_image[x, y, 3]:
+                        rgbd_image[x, y, 3] = max_depth
 
             #normalize rgb:
             rgbd_image[:, :, 0:3] = rgbd_image[:, :, 0:3]/255.0

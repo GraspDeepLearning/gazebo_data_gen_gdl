@@ -22,7 +22,8 @@
 
   <joint name="fixed" type="fixed">
       <axis xyz="0 2 ${height1/2}" />
-    <origin xyz="${camera_link} 0 ${height3 - axel_offset*2}" rpy="0 0 0"/>
+    <!--<origin xyz="${camera_link} 0 ${height3 - axel_offset*2}" rpy="0 0 0"/>-->
+    <origin xyz="0 0 0" rpy="0 0 0"/>
     <parent link="world"/>
     <child link="camera_link"/>
   </joint>

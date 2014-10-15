@@ -5,11 +5,13 @@ import tarfile
 import os
 import subprocess
 
+GDL_MODEL_PATH = os.environ["GDL_MODEL_PATH"]
+
 #location for files that are ready for use with gazebo and graspit
-PROCESSED_OUTPUT_DIR = "data/models/big_bird_models_processed"
+PROCESSED_OUTPUT_DIR = GDL_MODEL_PATH +  "/big_bird_models_processed"
 
 #location to download the raw files into
-RAW_DOWNLOAD_DIR = 'data/models/raw_big_bird_models'
+RAW_DOWNLOAD_DIR = GDL_MODEL_PATH + '/raw_big_bird_models'
 #temp file used since each model is downloaded individually
 TAR_FILE_NAME = 'processed.tgz'
 
@@ -26,7 +28,8 @@ def run_subprocess(cmd_string):
 
 def download_bigbird_models():
 
-	os.mkdir(RAW_DOWNLOAD_DIR)
+	if not os.path.exists(RAW_DOWNLOAD_DIR):
+		os.mkdir(RAW_DOWNLOAD_DIR)
 
 	url = "http://rll.berkeley.edu/bigbird/aliases/772151f9ac/"
 	req = urllib2.Request(url)
@@ -37,16 +40,19 @@ def download_bigbird_models():
 	model_names = []
 	for txt in html_split:
 	    if "/bigbird/images" in txt:
-	        model_names += (txt[29:-5])
-
+	        model_names.append(txt[29:-5])
+	
 	for model_name in model_names:
-		download_url = "http://rll.berkeley.edu/bigbird/aliases/772151f9ac/export/" + model_name + "/" + TAR_FILE_NAME
-		wget.download(download_url)
-		t = tarfile.open(TAR_FILE_NAME, 'r')
-		t.extractall(RAW_DOWNLOAD_DIR)
+		print ""
+		print model_name
+		if not os.path.exists(RAW_DOWNLOAD_DIR + '/' + model_name):
+			if os.path.exists(os.getcwd() + '/' + TAR_FILE_NAME):
+				os.remove(os.getcwd() + '/' + TAR_FILE_NAME)
 
-		os.remove(TAR_FILE_NAME)
-
+			download_url = "http://rll.berkeley.edu/bigbird/aliases/772151f9ac/export/" + model_name + "/" + TAR_FILE_NAME
+			wget.download(download_url)
+			t = tarfile.open(os.getcwd() + '/' + TAR_FILE_NAME, 'r')
+			t.extractall(RAW_DOWNLOAD_DIR)
 
 
 def prep_meshes_for_gazebo_and_graspit():
@@ -135,6 +141,7 @@ def prep_meshes_for_gazebo_and_graspit():
 		cmd += 'meshlabserver '
 		cmd +=  "-i " + raw_model_dir + "textured_meshes/optimized_tsdf_texture_mapped_mesh.obj "
 		cmd +=  "-o " + processed_model_dir + "optimized_tsdf_texture_mapped_mesh.dae" 
+		cmd +=  "-om vc vn wt"
 
 		run_subprocess(cmd)
 
@@ -224,5 +231,5 @@ def prep_meshes_for_gazebo_and_graspit():
 
 
 
-#download_models()
+download_bigbird_models()
 prep_meshes_for_gazebo_and_graspit()

@@ -8,6 +8,7 @@ import std_srvs.srv
 import numpy as np
 import os
 from time import sleep
+import time
 import math
 import tf
 import random
@@ -26,9 +27,10 @@ from src.xyz_to_pixel_loc import xyz_to_uv
 
 rospack = rospkg.RosPack()
 
-GAZEBO_MODEL_PATH = os.environ["GAZEBO_MODEL_PATH"]
-GRASPABLE_MODEL_PATH = GAZEBO_MODEL_PATH
-
+GDL_OBJECT_PATH = os.environ["GDL_OBJECT_PATH"]
+GRASPABLE_MODEL_PATH = GDL_OBJECT_PATH
+GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
+GDL_GRASPS_PATH = os.environ["GDL_GRASPS_PATH"]
 
 def gen_model_pose(model_orientation):
     model_pose = Pose()
@@ -70,8 +72,15 @@ def get_camera_pose_in_grasp_frame():
 
 
 if __name__ == '__main__':
+    saveImages = False
 
-    output_image_dir = os.path.expanduser("~/grasp_deep_learning/data/rgbd_images2/")
+    t = time.localtime()
+    minute = str(t.tm_min)
+    if len(minute) == 1:
+        minute = '0' + minute
+    t_string = str(t.tm_mon) + "_" + str(t.tm_mday) + "_" + str(t.tm_hour) + "_" + minute
+
+    output_image_dir = os.path.expanduser(GDL_DATA_PATH + "/rgbd_images_%s/" % t_string)
     models_dir = GRASPABLE_MODEL_PATH
 
     kinect_manager = GazeboKinectManager()
@@ -84,7 +93,8 @@ if __name__ == '__main__':
 
     model_manager = GazeboModelManager(models_dir=models_dir)
 
-    for model_name in os.listdir(os.path.expanduser("~/grasp_deep_learning/data/grasps/")):
+    for model_name in os.listdir(GDL_GRASPS_PATH):
+
 
         model_output_image_dir = output_image_dir + model_name + '/'
         if not os.path.exists(model_output_image_dir):
@@ -104,6 +114,7 @@ if __name__ == '__main__':
         grasps = get_model_grasps(model_name)
 
         dataset = h5py.File(model_output_image_dir + "rgbd_and_labels.h5")
+        print "Dataset is at: %s" % (model_output_image_dir + "rgbd_and_labels.h5")
         num_images = len(grasps)
 
         dataset.create_dataset("rgbd", (num_images, 480, 640, 4), chunks=(10, 480, 640, 4))
@@ -112,6 +123,7 @@ if __name__ == '__main__':
         dataset.create_dataset("rgbd_patch_labels", (num_images, 1))
 
         for index in range(len(grasps)):
+            print "%s / %s" % (index, len(grasps))
             grasp = grasps[index]
 
             transform_manager.add_transform(grasp.pose, "Model", "Grasp")
@@ -133,13 +145,17 @@ if __name__ == '__main__':
 
             grasp_points = np.zeros((480, 640))
             overlay = np.copy(rgbd_image[:, :, 0])
+            overlay_color = np.copy(rgbd_image[:, :, 0:3])
 
             #this is the pixel location of the grasp point
             u, v = xyz_to_uv((grasp_in_camera_frame.position.x, grasp_in_camera_frame.position.y, grasp_in_camera_frame.position.z))
 
             if u < overlay.shape[0]-2 and u > -2 and v < overlay.shape[1]-2 and v > -2:
                 overlay[u-2:u+2, v-2:v+2] = grasp.energy
-                grasp_points[u, v] = grasp.energy
+                overlay_color[u-2:u+2, v-2:v+2] = [0, 0, 255]
+                overlay_color[238:242, 318:322] = [255, 0, 0]
+                # u, v don't work properly so for now, setting grasp ponits manually
+                grasp_points[240, 320] = grasp.energy
 
             output_filepath = model_output_image_dir + model_name + "_" + str(index)
             if not os.path.exists(output_filepath):
@@ -156,20 +172,31 @@ if __name__ == '__main__':
             rgbd_image[:, :, 0:3] = rgbd_image[:, :, 0:3]/255.0
             #normalize d
             rgbd_image[:, :, 3] = rgbd_image[:, :, 3]/rgbd_image[:, :, 3].max()
+
+            #normalize overlay_color:
+            overlay_color[:, :, 0:3] = overlay_color[:, :, 0:3]/255.0
+
             #normalize grasp_points
             #all nonzero grasp points are currently negative, so divide by the min.
             grasp_points = grasp_points/grasp_points.min()
 
-            dataset["rgbd_patches"][index] = np.copy(rgbd_image[u-36:u+36, v-36:v+36, :])
+            # u,v don't work properly
+            #dataset["rgbd_patches"][index] = np.copy(rgbd_image[u-36:u+36, v-36:v+36, :])
+
+            dataset["rgbd_patches"][index] = np.copy(rgbd_image[240-36:240+36, 320-36:320+36, :])
             dataset["rgbd_patch_labels"][index] = grasp.energy
             dataset["rgbd"][index] = np.copy(rgbd_image)
             dataset["labels"][index] = np.copy(grasp_points)
+            dataset["joint_angles"][index] = grasp.joint_angles
 
-            misc.imsave(output_filepath + "/" + 'out.png', grasp_points)
-            misc.imsave(output_filepath + "/" + 'overlay.png', overlay)
-            misc.imsave(output_filepath + "/" + 'r.png', rgbd_image[:, :, 0])
-            misc.imsave(output_filepath + "/" + 'g.png', rgbd_image[:, :, 1])
-            misc.imsave(output_filepath + "/" + 'b.png', rgbd_image[:, :, 2])
-            misc.imsave(output_filepath + "/" + 'd.png', rgbd_image[:, :, 3])
+            if saveImages:
+                misc.imsave(output_filepath + "/" + 'out.png', grasp_points)
+                misc.imsave(output_filepath + "/" + 'overlay.png', overlay)
+                misc.imsave(output_filepath + "/" + 'overlay_color.png', overlay_color)
+                misc.imsave(output_filepath + "/" + 'rgb.png', rgbd_image[:, :, 0:3])
+                misc.imsave(output_filepath + "/" + 'r.png', rgbd_image[:, :, 0])
+                misc.imsave(output_filepath + "/" + 'g.png', rgbd_image[:, :, 1])
+                misc.imsave(output_filepath + "/" + 'b.png', rgbd_image[:, :, 2])
+                misc.imsave(output_filepath + "/" + 'd.png', rgbd_image[:, :, 3])
 
         model_manager.remove_model(model_name)

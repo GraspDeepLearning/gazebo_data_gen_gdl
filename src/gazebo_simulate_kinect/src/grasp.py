@@ -1,21 +1,18 @@
 
 import os
+
+from collections import namedtuple
 from geometry_msgs.msg import Pose
 
-class Grasp():
 
-    def __init__(self,energy, joint_angles, pose):
-        self.energy = energy
-        self.joint_angles = joint_angles
-        self.pose = pose
-
+Grasp = namedtuple('Grasp', 'energy joint_angles pose')
 
 
 def get_model_grasps(model_name):
 
     grasps = []
 
-    graspfilepath = os.path.expanduser("~/grasp_deep_learning/data/grasps/" + model_name)
+    graspfilepath = os.path.expanduser(os.environ["GDL_GRASPS_PATH"] + "/" + model_name)
     for graspfile in os.listdir(graspfilepath):
         new_grasps = graspfilepath_to_grasps(graspfilepath + "/" + graspfile)
         for grasp in new_grasps:
@@ -38,8 +35,6 @@ def graspfilepath_to_grasps(graspfilepath):
             energy = float(line[len("energy: "):])
         if "joint_angles: " in line:
             joint_angles = line[len("joint_angles: "):-1]
-            #import IPython
-            #IPython.embed()
             joint_angles = [float(joint_angle) for joint_angle in joint_angles.split()]
         if "pose: " in line:
             pose_array = line[len("pose: "):]

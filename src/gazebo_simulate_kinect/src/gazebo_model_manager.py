@@ -27,8 +27,8 @@ from scipy import misc
 import h5py
 
 
-GAZEBO_MODEL_PATH = os.environ["GAZEBO_MODEL_PATH"]
-GRASPABLE_MODEL_PATH = GAZEBO_MODEL_PATH
+GDL_OBJECT_PATH = os.environ["GDL_OBJECT_PATH"]
+GRASPABLE_MODEL_PATH = GDL_OBJECT_PATH
 #GRASPABLE_MODEL_PATH = rospack.get_path('object_models') + "/models/cgdb/model_database/"
 
 class RGBDListener():

@@ -67,7 +67,7 @@ def prep_meshes_for_gazebo_and_graspit():
 
 	os.mkdir(PROCESSED_OUTPUT_DIR)
 	models = os.listdir(RAW_DOWNLOAD_DIR)
-
+    
 	for model_name in models:
 
 		raw_model_dir = RAW_DOWNLOAD_DIR + "/" + model_name + "/"
@@ -139,9 +139,9 @@ def prep_meshes_for_gazebo_and_graspit():
 		################################
 		cmd = ""
 		cmd += 'meshlabserver '
-		cmd +=  "-i " + raw_model_dir + "textured_meshes/optimized_tsdf_texture_mapped_mesh.obj "
+		cmd +=  "-i " + processed_model_dir + "optimized_tsdf_texture_mapped_mesh.obj "
 		cmd +=  "-o " + processed_model_dir + "optimized_tsdf_texture_mapped_mesh.dae" 
-		cmd +=  "-om vc vn wt"
+		cmd +=  " -om vc vn fc wt"
 
 		run_subprocess(cmd)
 

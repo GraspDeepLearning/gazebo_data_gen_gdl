@@ -14,11 +14,6 @@ import tf
 import random
 from scipy import misc
 import h5py
-import copy
-import PyKDL
-import tf_conversions
-
-import matplotlib.pyplot as plt
 
 from src.gazebo_model_manager import GazeboKinectManager, GazeboModelManager
 from src.grasp import get_model_grasps
@@ -31,6 +26,7 @@ GDL_OBJECT_PATH = os.environ["GDL_OBJECT_PATH"]
 GRASPABLE_MODEL_PATH = GDL_OBJECT_PATH
 GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
 GDL_GRASPS_PATH = os.environ["GDL_GRASPS_PATH"]
+
 
 def gen_model_pose(model_orientation):
     model_pose = Pose()
@@ -148,13 +144,15 @@ if __name__ == '__main__':
             overlay_color = np.copy(rgbd_image[:, :, 0:3])
 
             #this is the pixel location of the grasp point
-            u, v = xyz_to_uv((grasp_in_camera_frame.position.x, grasp_in_camera_frame.position.y, grasp_in_camera_frame.position.z))
+            u, v = xyz_to_uv((grasp_in_camera_frame.position.x,
+                              grasp_in_camera_frame.position.y,
+                              grasp_in_camera_frame.position.z))
 
             if u < overlay.shape[0]-2 and u > -2 and v < overlay.shape[1]-2 and v > -2:
                 overlay[u-2:u+2, v-2:v+2] = grasp.energy
                 overlay_color[u-2:u+2, v-2:v+2] = [0, 0, 255]
                 overlay_color[238:242, 318:322] = [255, 0, 0]
-                # u, v don't work properly so for now, setting grasp ponits manually
+                # u, v don't work properly so for now, setting grasp points manually
                 grasp_points[240, 320] = grasp.energy
 
             output_filepath = model_output_image_dir + model_name + "_" + str(index)
@@ -183,11 +181,10 @@ if __name__ == '__main__':
             # u,v don't work properly
             #dataset["rgbd_patches"][index] = np.copy(rgbd_image[u-36:u+36, v-36:v+36, :])
 
-            dataset["rgbd_patches"][index] = np.copy(rgbd_image[240-36:240+36, 320-36:320+36, :])
-            dataset["rgbd_patch_labels"][index] = grasp.energy
             dataset["rgbd"][index] = np.copy(rgbd_image)
-            dataset["labels"][index] = np.copy(grasp_points)
+            dataset["grasp_energy"][index] = grasp.energy
             dataset["joint_angles"][index] = grasp.joint_angles
+            dataset["joint_values"][index] = grasp.joint_values
 
             if saveImages:
                 misc.imsave(output_filepath + "/" + 'out.png', grasp_points)

@@ -36,6 +36,9 @@ def graspfilepath_to_grasps(graspfilepath):
         if "joint_angles: " in line:
             joint_angles = line[len("joint_angles: "):-1]
             joint_angles = [float(joint_angle) for joint_angle in joint_angles.split()]
+        if "jointValues: " in line:
+            joint_angles = line[len("jointValues: "):-1]
+            joint_angles = [float(joint_angle) for joint_angle in joint_angles.split()]
         if "pose: " in line:
             pose_array = line[len("pose: "):]
             pose_array = [float(x) for x in pose_array.split()][1:]

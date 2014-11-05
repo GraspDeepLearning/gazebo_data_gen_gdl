@@ -1,31 +1,21 @@
 #!/usr/bin/env python
 import rospy
 import rospkg
-rospack = rospkg.RosPack()
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Pose
 from gazebo_ros import gazebo_interface
-from gazebo_msgs.srv import DeleteModelRequest, DeleteModel, DeleteModelResponse, GetModelState, GetModelStateRequest, SetModelState, SetModelStateRequest
+from gazebo_msgs.srv import (DeleteModelRequest, DeleteModel, GetModelState,
+                             GetModelStateRequest, SetModelState, SetModelStateRequest)
 
 import numpy as np
 import os
 from time import sleep
-import matplotlib.pyplot as plt
-import sys
 
 import tf_conversions
-import xyz_to_pixel_loc
 import PyKDL
 import math
-import std_srvs.srv
 
-import tf
-import random
-
-from scipy import misc
-
-import h5py
-
+rospack = rospkg.RosPack()
 
 GDL_OBJECT_PATH = os.environ["GDL_OBJECT_PATH"]
 GRASPABLE_MODEL_PATH = GDL_OBJECT_PATH
@@ -117,7 +107,7 @@ class GazeboModelManager():
 
     def __init__(self,
                  gazebo_namespace="/gazebo",
-                 models_dir=GAZEBO_MODEL_PATH):
+                 models_dir=GDL_OBJECT_PATH):
 
         self.gazebo_namespace = gazebo_namespace
         self.models_dir = models_dir

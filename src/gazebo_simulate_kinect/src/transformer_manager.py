@@ -1,6 +1,7 @@
 
 import tf
 import rospy
+from time import sleep
 
 
 class TransformerManager():
@@ -21,6 +22,7 @@ class TransformerManager():
         transform_msg.header.frame_id = frame_id
 
         self.transformer.setTransform(transform_msg)
+        sleep(.1)
 
 
     def transform_pose(self, pose, old_frame, new_frame):
@@ -37,4 +39,6 @@ class TransformerManager():
 
         transform_msg.header.frame_id = old_frame
 
-        return self.transformer.transformPose(new_frame, transform_msg)
+        result = self.transformer.transformPose(new_frame, transform_msg)
+        sleep(0.1)
+        return result

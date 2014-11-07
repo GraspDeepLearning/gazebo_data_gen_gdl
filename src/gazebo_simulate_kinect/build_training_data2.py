@@ -22,33 +22,19 @@ from src.gazebo_model_manager import GazeboKinectManager, GazeboModelManager
 from src.grasp import get_model_grasps
 from src.transformer_manager import TransformerManager
 from src.xyz_to_pixel_loc import xyz_to_uv
+import copy
 
 rospack = rospkg.RosPack()
 
-GAZEBO_MODEL_PATH = os.environ["GAZEBO_MODEL_PATH"]
+GAZEBO_MODEL_PATH = os.path.expanduser("~/grasp_deep_learning/data/test_model_vc") #os.environ["GAZEBO_MODEL_PATH"]
 GRASPABLE_MODEL_PATH = GAZEBO_MODEL_PATH
 
-
-def gen_model_pose(model_orientation):
-    model_pose = Pose()
-    model_pose.position.x = 2 + random.uniform(-.25, .25)
-    model_pose.position.y = 0.0 + random.uniform(-.25, .25)
-    model_pose.position.z = 5 + random.uniform(-.25, .25)
-
-    roll = model_orientation[0]
-    pitch = model_orientation[1]
-    yaw = model_orientation[2]
-
-    quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
-    model_pose.orientation.x = quaternion[0]
-    model_pose.orientation.y = quaternion[1]
-    model_pose.orientation.z = quaternion[2]
-    model_pose.orientation.w = quaternion[3]
-
-    return model_pose
+NUM_VIRTUAL_CONTACTS = 16
+NUM_RGBD_PATCHES_PER_IMAGE = NUM_VIRTUAL_CONTACTS + 1
 
 
-def get_camera_pose_in_grasp_frame(grasp):
+
+def build_camera_pose_in_grasp_frame(grasp):
     camera_pose = Pose()
 
     #this will back the camera off along the approach direction 2 meters
@@ -57,8 +43,9 @@ def get_camera_pose_in_grasp_frame(grasp):
     #the camera points along the x direction, and we need it to point along the z direction
     roll = -math.pi/2.0
     pitch = -math.pi/2.0
-    # rotate so that gripper is upright.
-    yaw = math.pi/2.0 + grasp.joint_angles[1]
+
+    # rotate so that camera is upright.
+    yaw = -math.pi/2.0 + grasp.joint_angles[1]
 
     quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
 
@@ -68,6 +55,69 @@ def get_camera_pose_in_grasp_frame(grasp):
     camera_pose.orientation.w = quaternion[3]
 
     return camera_pose
+
+
+def calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp):
+    vc_uvs = []
+
+    #this is the pixel location of the grasp point
+    u, v = xyz_to_uv((grasp_in_camera_frame.position.x, grasp_in_camera_frame.position.y, grasp_in_camera_frame.position.z))
+
+    vc_uvs.append((u, v))
+    for vc in grasp.virtual_contacts:
+        pose = Pose()
+        pose.position.x = vc[0]
+        pose.position.y = vc[1]
+        pose.position.z = vc[2]
+        pose_in_camera_frame = transform_manager.transform_pose(pose, "Grasp", "Camera").pose
+        u, v = xyz_to_uv((pose_in_camera_frame.position.x, pose_in_camera_frame.position.y, pose_in_camera_frame.position.z))
+        vc_uvs.append((u, v))
+
+    return vc_uvs
+
+
+def fill_images_with_grasp_points(vc_uvs, grasp, rgbd_image):
+
+    grasp_points = np.zeros((len(vc_uvs), 480, 640))
+    overlay = np.copy(rgbd_image[:, :, 0])
+    rgbd_patches = np.zeros((len(vc_uvs), 72, 72, 4))
+
+    for i in range(len(vc_uvs)):
+        vc_u, vc_v = vc_uvs[i]
+        try:
+            overlay[vc_u-2:vc_u+2, vc_v-2:vc_v+2] = grasp.energy
+            grasp_points[i, vc_u, vc_v] = grasp.energy
+            rgbd_patches[i] = rgbd_image[vc_u-36:vc_u+36, vc_v-36:vc_v+36, :]
+        except Exception as e:
+            print "u,v probably outside of image"
+            print e
+
+    return rgbd_patches, grasp_points, overlay
+
+
+def create_save_path(model_output_image_dir, model_name, index ):
+    output_filepath = model_output_image_dir + model_name + "_" + str(index)
+    if not os.path.exists(output_filepath):
+        os.makedirs(output_filepath)
+
+    if not os.path.exists(model_output_image_dir + "overlays"):
+        os.makedirs(model_output_image_dir + "overlays")
+
+    return output_filepath
+
+
+def update_transforms(transform_manager, grasp, kinect_manager):
+    transform_manager.add_transform(grasp.pose, "Model", "Grasp")
+
+    camera_pose_in_grasp_frame = build_camera_pose_in_grasp_frame(grasp)
+
+    camera_pose_in_world_frame = transform_manager.transform_pose(camera_pose_in_grasp_frame, "Grasp", "World")
+
+    kinect_manager.set_model_state(camera_pose_in_world_frame.pose)
+
+    transform_manager.add_transform(camera_pose_in_world_frame.pose, "World", "Camera")
+
+
 
 
 if __name__ == '__main__':
@@ -90,7 +140,12 @@ if __name__ == '__main__':
 
     sleep(0.5)
 
-    for model_name in os.listdir(os.path.expanduser("~/grasp_deep_learning/data/grasps/")):
+    for model_name in os.listdir(os.path.expanduser(GAZEBO_MODEL_PATH)):
+
+        grasps = get_model_grasps(model_name)
+
+        if not grasps:
+            continue
 
         model_output_image_dir = output_image_dir + model_name + '/'
         if not os.path.exists(model_output_image_dir):
@@ -107,8 +162,6 @@ if __name__ == '__main__':
         model_pose_in_world_frame = model_manager.get_model_state(model_name).pose
         transform_manager.add_transform(model_pose_in_world_frame, "World", "Model")
 
-        grasps = get_model_grasps(model_name)
-
         dataset_fullfilename = model_output_image_dir + "rgbd_and_labels.h5"
 
         if os.path.isfile(dataset_fullfilename):
@@ -117,84 +170,41 @@ if __name__ == '__main__':
         dataset = h5py.File(dataset_fullfilename)
         num_images = len(grasps)
 
+        chunk_size = 10
         if num_images < 10:
-            num_images = 10
+            chunk_size = num_images
 
-        dataset.create_dataset("rgbd", (num_images, 480, 640, 4), chunks=(10, 480, 640, 4))
-        dataset.create_dataset("labels", (num_images, 480, 640), chunks=(10, 480, 640))
-        dataset.create_dataset("rgbd_patches", (num_images, 72, 72, 4), chunks=(10, 72, 72, 4))
+        dataset.create_dataset("rgbd", (num_images, 480, 640, 4), chunks=(chunk_size, 480, 640, 4))
+        dataset.create_dataset("labels", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 480, 640), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 480, 640))
+        dataset.create_dataset("rgbd_patches", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4))
         dataset.create_dataset("rgbd_patch_labels", (num_images, 1))
-
-        rospy.loginfo("overriding u and v!!!!!!!!!!!!")
 
         for index in range(len(grasps)):
             grasp = grasps[index]
 
-            transform_manager.add_transform(grasp.pose, "Model", "Grasp")
-            sleep(0.5)
-
-            camera_pose_in_grasp_frame = get_camera_pose_in_grasp_frame(grasp)
-
-            camera_pose_in_world_frame = transform_manager.transform_pose(camera_pose_in_grasp_frame, "Grasp", "World")
-
-            kinect_manager.set_model_state(camera_pose_in_world_frame.pose)
-
-            transform_manager.add_transform(camera_pose_in_world_frame.pose, "World", "Camera")
-
+            update_transforms(transform_manager, grasp, kinect_manager)
             grasp_in_camera_frame = transform_manager.transform_pose(grasp.pose, "Grasp", "Camera").pose
 
-            sleep(0.5)
+            #vc_uvs is a list of (x,y,z)tuples in the camera_frame representing:
+            #1)the palm,
+            #2)all the virtual contacts used in graspit
+            vc_uvs = calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp)
 
-            rgbd_image = np.copy(kinect_manager.get_rgbd_image())
+            #this is a processed rgbd_image that has been normalized and any nans have been removed
+            rgbd_image = np.copy(kinect_manager.get_normalized_rgbd_image())
 
-            grasp_points = np.zeros((480, 640))
-            overlay = np.copy(rgbd_image[:, :, 0])
+            rgbd_patches, grasp_points, overlay = fill_images_with_grasp_points(vc_uvs, grasp, rgbd_image)
 
-            #this is the pixel location of the grasp point
-            u, v = xyz_to_uv((grasp_in_camera_frame.position.x, grasp_in_camera_frame.position.y, grasp_in_camera_frame.position.z))
+            output_filepath = create_save_path(model_output_image_dir, model_name, index)
 
-            if u < overlay.shape[0]-2 and u > -2 and v < overlay.shape[1]-2 and v > -2:
-                overlay[u-2:u+2, v-2:v+2] = grasp.energy
-                overlay[overlay.shape[0]/2.0-3:overlay.shape[0]/2.0+3, overlay.shape[1]/2.0-3:overlay.shape[1]/2.0+3] = grasp.energy
-                overlay[overlay.shape[0]/2.0-3:overlay.shape[0]/2.0+3, overlay.shape[1]/2.0-3:overlay.shape[1]/2.0+3] = grasp.energy
-                grasp_points[u, v] = grasp.energy
-
-            output_filepath = model_output_image_dir + model_name + "_" + str(index)
-            if not os.path.exists(output_filepath):
-                os.makedirs(output_filepath)
-
-            if not os.path.exists(model_output_image_dir + "overlays"):
-                os.makedirs(model_output_image_dir + "overlays")
-
-            #fix nans in depth
-            max_depth = np.nan_to_num(rgbd_image[:, :, 3]).max()*1.3
-            for x in range(rgbd_image.shape[0]):
-                for y in range(rgbd_image.shape[1]):
-                    if rgbd_image[x, y, 3] != rgbd_image[x, y, 3]:
-                        rgbd_image[x, y, 3] = max_depth
-
-            #normalize rgb:
-            rgbd_image[:, :, 0:3] = rgbd_image[:, :, 0:3]/255.0
-            #normalize d
-            rgbd_image[:, :, 3] = rgbd_image[:, :, 3]/rgbd_image[:, :, 3].max()
-            #normalize grasp_points
-            #all nonzero grasp points are currently negative, so divide by the min.
-            grasp_points = grasp_points/grasp_points.min()
-
-
-            u = overlay.shape[0]/2.0
-            v = overlay.shape[1]/2.0
-            dataset["rgbd_patches"][index] = np.copy(rgbd_image[u-36:u+36, v-36:v+36, :])
+            dataset["rgbd_patches"][index] = np.copy(rgbd_patches)
             dataset["rgbd_patch_labels"][index] = grasp.energy
             dataset["rgbd"][index] = np.copy(rgbd_image)
             dataset["labels"][index] = np.copy(grasp_points)
 
-            misc.imsave(output_filepath + "/" + 'out.png', grasp_points)
             misc.imsave(output_filepath + "/" + 'overlay.png', overlay)
             misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)
-            misc.imsave(output_filepath + "/" + 'r.png', rgbd_image[:, :, 0])
-            misc.imsave(output_filepath + "/" + 'g.png', rgbd_image[:, :, 1])
-            misc.imsave(output_filepath + "/" + 'b.png', rgbd_image[:, :, 2])
+            misc.imsave(output_filepath + "/" + 'rgb.png', rgbd_image[:, :, 0:3])
             misc.imsave(output_filepath + "/" + 'd.png', rgbd_image[:, :, 3])
 
         model_manager.remove_model(model_name)

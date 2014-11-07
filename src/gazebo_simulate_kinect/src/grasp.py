@@ -4,10 +4,11 @@ from geometry_msgs.msg import Pose
 
 class Grasp():
 
-    def __init__(self,energy, joint_angles, pose):
+    def __init__(self,energy, joint_angles, pose, virtual_contacts):
         self.energy = energy
         self.joint_angles = joint_angles
         self.pose = pose
+        self.virtual_contacts = virtual_contacts
 
 
 
@@ -16,6 +17,11 @@ def get_model_grasps(model_name):
     grasps = []
 
     graspfilepath = os.path.expanduser("~/grasp_deep_learning/data/grasps/" + model_name)
+
+    if not os.path.exists(graspfilepath):
+        print graspfilepath + " does not exist, skipping this object"
+        return None
+
     for graspfile in os.listdir(graspfilepath):
         new_grasps = graspfilepath_to_grasps(graspfilepath + "/" + graspfile)
         for grasp in new_grasps:
@@ -32,16 +38,19 @@ def graspfilepath_to_grasps(graspfilepath):
 
     energy = 0
     joint_angles = []
+    pose = Pose()
+    virtual_contacts = []
+    reading_vcs = False
 
     for line in f.readlines():
         if "energy: " in line:
             energy = float(line[len("energy: "):])
-        if "joint_angles: " in line:
+        elif "joint_angles: " in line:
             joint_angles = line[len("joint_angles: "):-1]
             #import IPython
             #IPython.embed()
             joint_angles = [float(joint_angle) for joint_angle in joint_angles.split()]
-        if "pose: " in line:
+        elif "pose: " in line:
             pose_array = line[len("pose: "):]
             pose_array = [float(x) for x in pose_array.split()][1:]
             pose = Pose()
@@ -56,6 +65,27 @@ def graspfilepath_to_grasps(graspfilepath):
             # pose.orientation.x = pose_array[3]
             # pose.orientation.y = pose_array[4]
             # pose.orientation.z = pose_array[5]
-            grasps.append(Grasp(energy, joint_angles, pose))
+
+        elif "virtual contacts" in line:
+            reading_vcs = True
+
+        elif reading_vcs:
+            vc_array = line.split()
+
+            #check if we are finished
+            if len(vc_array) != 3:
+                grasps.append(Grasp(energy, joint_angles, pose, virtual_contacts))
+                reading_vcs = False
+                virtual_contacts = []
+
+            else:
+                x = float(vc_array[0])/1000.0
+                y = float(vc_array[1])/1000.0
+                z = float(vc_array[2])/1000.0
+
+                virtual_contacts.append((x, y, z))
+
+
+
 
     return grasps

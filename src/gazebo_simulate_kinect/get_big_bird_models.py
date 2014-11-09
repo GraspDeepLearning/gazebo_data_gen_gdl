@@ -75,7 +75,6 @@ def prep_meshes_for_gazebo_and_graspit():
 
 		os.mkdir(processed_model_dir)
 
-
 		################################
 		# write the .iv file
 		################################
@@ -130,18 +129,6 @@ def prep_meshes_for_gazebo_and_graspit():
 		cmd += 'cp '
 		cmd +=  raw_model_dir + "textured_meshes/optimized_tsdf_texture_mapped_mesh.mtl "
 		cmd +=  processed_model_dir
-
-		run_subprocess(cmd)
-
-
-		################################
-		# write the .dae file
-		################################
-		cmd = ""
-		cmd += 'meshlabserver '
-		cmd +=  "-i " + processed_model_dir + "optimized_tsdf_texture_mapped_mesh.obj "
-		cmd +=  "-o " + processed_model_dir + "optimized_tsdf_texture_mapped_mesh.dae" 
-		cmd +=  " -om vc vn fc wt"
 
 		run_subprocess(cmd)
 

@@ -56,7 +56,7 @@ def gen_model_pose(model_orientation):
 
 if __name__ == '__main__':
 
-    output_image_dir = os.path.expanduser("~/grasp_deep_learning/data/rgbd_images/")
+    output_image_dir = os.path.expanduser("~/grasp_deep_learning/data/raw_rgbd_images/")
     models_dir = GRASPABLE_MODEL_PATH
 
     kinect_manager = GazeboKinectManager()

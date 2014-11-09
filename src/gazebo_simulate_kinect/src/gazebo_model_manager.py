@@ -4,8 +4,9 @@ import rospkg
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Pose
 from gazebo_ros import gazebo_interface
-from gazebo_msgs.srv import (DeleteModelRequest, DeleteModel, GetModelState,
-                             GetModelStateRequest, SetModelState, SetModelStateRequest)
+from gazebo_msgs.srv import (DeleteModelRequest, DeleteModelResponse, DeleteModel, 
+                             GetModelState, GetModelStateRequest, GetWorldProperties,
+                             SetModelState, SetModelStateRequest)
 
 import numpy as np
 import os
@@ -20,6 +21,7 @@ rospack = rospkg.RosPack()
 GDL_OBJECT_PATH = os.environ["GDL_OBJECT_PATH"]
 GRASPABLE_MODEL_PATH = GDL_OBJECT_PATH
 #GRASPABLE_MODEL_PATH = rospack.get_path('object_models') + "/models/cgdb/model_database/"
+
 
 class RGBDListener():
 
@@ -87,8 +89,21 @@ class GazeboKinectManager():
                                                 reference_frame="world",
                                                 gazebo_namespace=self.gazebo_namespace)
 
-    def get_rgbd_image(self):
-        return self.rgbd_listener.rgbd_image
+    def get_normalized_rgbd_image(self):
+        rgbd_image = np.copy(self.rgbd_listener.rgbd_image)
+        #fix nans in depth
+        max_depth = np.nan_to_num(rgbd_image[:, :, 3]).max()*1.3
+        for x in range(rgbd_image.shape[0]):
+            for y in range(rgbd_image.shape[1]):
+                if rgbd_image[x, y, 3] != rgbd_image[x, y, 3]:
+                    rgbd_image[x, y, 3] = max_depth
+
+        #normalize rgb:
+        rgbd_image[:, :, 0:3] = rgbd_image[:, :, 0:3]/255.0
+        #normalize d
+        rgbd_image[:, :, 3] = rgbd_image[:, :, 3]/rgbd_image[:, :, 3].max()
+
+        return rgbd_image
 
     def get_model_state(self):
         get_model_state_req = GetModelStateRequest()
@@ -111,14 +126,29 @@ class GazeboModelManager():
 
         self.gazebo_namespace = gazebo_namespace
         self.models_dir = models_dir
-        self.delete_model_service = rospy.ServiceProxy(gazebo_namespace + '/delete_model', DeleteModel)
-        self.get_model_state_service = rospy.ServiceProxy(gazebo_namespace + '/get_model_state', GetModelState)
-        self.set_model_state_service = rospy.ServiceProxy(gazebo_namespace + '/set_model_state', SetModelState)
+        self.delete_model_service_proxy = rospy.ServiceProxy(gazebo_namespace + '/delete_model', DeleteModel)
+        self.get_model_state_service_proxy = rospy.ServiceProxy(gazebo_namespace + '/get_model_state', GetModelState)
+        self.set_model_state_service_proxy = rospy.ServiceProxy(gazebo_namespace + '/set_model_state', SetModelState)
+        self.get_world_properties_proxy = rospy.ServiceProxy(gazebo_namespace + '/get_world_properties', GetWorldProperties)
+        self.pause_physics_service_proxy = rospy.ServiceProxy(gazebo_namespace + "/pause_physics", std_srvs.srv.Empty)
+        self.unpause_physics_service_proxy = rospy.ServiceProxy(gazebo_namespace + "/unpause_physics", std_srvs.srv.Empty)
 
     def remove_model(self, model_name="coke_can"):
 
         del_model_req = DeleteModelRequest(model_name)
-        self.delete_model_service(del_model_req)
+        self.delete_model_service_proxy(del_model_req)
+
+    def clear_world(self):
+        world_properties = self.get_world_properties_proxy()
+        for model_name in world_properties.model_names:
+            if model_name != "camera1":
+                self.remove_model(model_name)
+
+    def pause_physics(self):
+        self.pause_physics_service_proxy()
+
+    def unpause_physics(self):
+        self.unpause_physics_service_proxy()
 
     def spawn_model(self, model_name="coke_can", model_type="coke_can", model_pose=None):
 
@@ -145,16 +175,16 @@ class GazeboModelManager():
     def does_world_contain_model(self, model_name="coke_can"):
         get_model_state_req = GetModelStateRequest()
         get_model_state_req.model_name = model_name
-        resp = self.get_model_state_service(get_model_state_req)
+        resp = self.get_model_state_service_proxy(get_model_state_req)
         return resp.success
 
     def get_model_state(self, model_name="coke_can"):
         get_model_state_req = GetModelStateRequest()
         get_model_state_req.model_name = model_name
-        return self.get_model_state_service(get_model_state_req)
+        return self.get_model_state_service_proxy(get_model_state_req)
 
     def set_model_state(self, model_name="coke_can", pose=Pose()):
         set_model_state_req = SetModelStateRequest()
         set_model_state_req.model_state.model_name = model_name
         set_model_state_req.model_state.pose = pose
-        return self.set_model_state_service(set_model_state_req)
+        return self.set_model_state_service_proxy(set_model_state_req)

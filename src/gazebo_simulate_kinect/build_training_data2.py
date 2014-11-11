@@ -22,13 +22,14 @@ import copy
 
 rospack = rospkg.RosPack()
 
-GDL_OBJECT_PATH = os.environ["GDL_OBJECT_PATH"]
-GRASPABLE_MODEL_PATH = GDL_OBJECT_PATH
 GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
+#GRASPABLE_MODEL_PATH = os.environ["GDL_OBJECT_PATH"]
 GDL_GRASPS_PATH = os.environ["GDL_GRASPS_PATH"]
 GDL_MODEL_PATH = os.environ["GDL_MODEL_PATH"] + "/big_bird_models_processed"
 
 NUM_VIRTUAL_CONTACTS = 16
+
+#the +1 is for the center of the palm.
 NUM_RGBD_PATCHES_PER_IMAGE = NUM_VIRTUAL_CONTACTS + 1
 
 
@@ -84,7 +85,7 @@ def fill_images_with_grasp_points(vc_uvs, grasp, rgbd_image):
     for i in range(len(vc_uvs)):
         vc_u, vc_v = vc_uvs[i]
         try:
-            overlay[vc_u-2:vc_u+2, vc_v-2:vc_v+2] = grasp.energy
+            overlay[vc_u-2:vc_u+2, vc_v-2:vc_v+2] = 1.0
             grasp_points[i, vc_u, vc_v] = grasp.energy
             rgbd_patches[i] = rgbd_image[vc_u-36:vc_u+36, vc_v-36:vc_v+36, :]
         except Exception as e:
@@ -117,20 +118,21 @@ def update_transforms(transform_manager, grasp, kinect_manager):
     transform_manager.add_transform(camera_pose_in_world_frame.pose, "World", "Camera")
 
 
-
-
-if __name__ == '__main__':
-    saveImages = False
-
+def get_date_string():
     t = time.localtime()
     minute = str(t.tm_min)
     if len(minute) == 1:
         minute = '0' + minute
     t_string = str(t.tm_mon) + "_" + str(t.tm_mday) + "_" + str(t.tm_hour) + "_" + minute
+    return t_string
 
-    output_image_dir = os.path.expanduser(GDL_DATA_PATH + "/rgbd_images_%s/" % t_string)
+
+if __name__ == '__main__':
+    saveImages = False
+
+    output_image_dir = os.path.expanduser(GDL_DATA_PATH + "/rgbd_images_%s/" % get_date_string())
     sleep(2)
-    models_dir = GRASPABLE_MODEL_PATH
+    models_dir = GDL_MODEL_PATH
 
     model_manager = GazeboModelManager(models_dir=models_dir)
     model_manager.pause_physics()
@@ -145,12 +147,20 @@ if __name__ == '__main__':
 
     sleep(0.5)
 
-    for model_name in os.listdir(os.path.expanduser(GDL_MODEL_PATH)):
+    model_names = os.listdir(GDL_MODEL_PATH)
+
+    for model_name in os.listdir(GDL_GRASPS_PATH):
 
         grasps = get_model_grasps(model_name)
 
-    for model_name in os.listdir(GDL_GRASPS_PATH):
+        #do we have grasps for this model
         if not grasps:
+            print str(model_name) + ' has no grasps'
+            continue
+
+        #do we actually have the model
+        if not model_name in model_names:
+            print 'we have grasps for ' + str(model_name) + ' but the model is not in the models directory'
             continue
 
         model_output_image_dir = output_image_dir + model_name + '/'
@@ -177,6 +187,8 @@ if __name__ == '__main__':
         print "Dataset is at: %s" % (dataset_fullfilename)
 
         num_images = len(grasps)
+        if num_images > 5:
+            num_images = 5
 
         chunk_size = 10
         if num_images < 10:
@@ -187,9 +199,9 @@ if __name__ == '__main__':
         dataset.create_dataset("rgbd_patches", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4))
         dataset.create_dataset("rgbd_patch_labels", (num_images, 1))
 
-        for index in range(len(grasps)):
+        for index in range(num_images):
 
-            print "%s / %s" % (index, len(grasps))
+            print "%s / %s grasps for %s" % (index, num_images, model_name)
             grasp = grasps[index]
 
             update_transforms(transform_manager, grasp, kinect_manager)

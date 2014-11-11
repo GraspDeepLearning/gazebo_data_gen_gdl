@@ -19,10 +19,6 @@ import std_srvs.srv
 
 rospack = rospkg.RosPack()
 
-GDL_OBJECT_PATH = os.environ["GDL_OBJECT_PATH"]
-GRASPABLE_MODEL_PATH = GDL_OBJECT_PATH
-#GRASPABLE_MODEL_PATH = rospack.get_path('object_models') + "/models/cgdb/model_database/"
-
 
 class RGBDListener():
 
@@ -122,8 +118,8 @@ class GazeboKinectManager():
 class GazeboModelManager():
 
     def __init__(self,
-                 gazebo_namespace="/gazebo",
-                 models_dir=GDL_OBJECT_PATH):
+                 models_dir,
+                 gazebo_namespace="/gazebo"):
 
         self.gazebo_namespace = gazebo_namespace
         self.models_dir = models_dir

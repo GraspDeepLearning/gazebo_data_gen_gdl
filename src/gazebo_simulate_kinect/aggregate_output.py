@@ -1,9 +1,9 @@
 import h5py
 import os
 
-GDL_DATA_PATH = os.environ["GDL_PATH"] + "data"
+GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
 
-input_directory = GDL_DATA_PATH + '/rgbd_images_11_11_13_44'
+input_directory = GDL_DATA_PATH + '/rgbd_images_11_11_16_03'
 
 subdirs = os.listdir(input_directory)
 

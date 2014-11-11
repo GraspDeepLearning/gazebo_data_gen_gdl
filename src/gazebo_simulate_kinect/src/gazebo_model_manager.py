@@ -15,6 +15,7 @@ from time import sleep
 import tf_conversions
 import PyKDL
 import math
+import std_srvs.srv
 
 rospack = rospkg.RosPack()
 
@@ -151,7 +152,6 @@ class GazeboModelManager():
         self.unpause_physics_service_proxy()
 
     def spawn_model(self, model_name="coke_can", model_type="coke_can", model_pose=None):
-
         model_xml = open(self.models_dir + "/" + model_type + "/model.sdf").read()
         if not model_pose:
             model_pose = Pose()

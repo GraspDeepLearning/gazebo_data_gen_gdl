@@ -4,13 +4,7 @@ import os
 from collections import namedtuple
 from geometry_msgs.msg import Pose
 
-    def __init__(self,energy, joint_angles, pose, virtual_contacts):
-        self.energy = energy
-        self.joint_angles = joint_angles
-        self.pose = pose
-        self.virtual_contacts = virtual_contacts
-
-Grasp = namedtuple('Grasp', 'energy joint_angles pose')
+Grasp = namedtuple('Grasp', 'energy joint_angles pose virtual_contacts')
 
 
 def get_model_grasps(model_name):

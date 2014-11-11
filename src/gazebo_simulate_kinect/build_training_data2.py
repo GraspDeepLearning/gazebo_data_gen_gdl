@@ -26,6 +26,7 @@ GDL_OBJECT_PATH = os.environ["GDL_OBJECT_PATH"]
 GRASPABLE_MODEL_PATH = GDL_OBJECT_PATH
 GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
 GDL_GRASPS_PATH = os.environ["GDL_GRASPS_PATH"]
+GDL_MODEL_PATH = os.environ["GDL_MODEL_PATH"] + "/big_bird_models_processed"
 
 NUM_VIRTUAL_CONTACTS = 16
 NUM_RGBD_PATCHES_PER_IMAGE = NUM_VIRTUAL_CONTACTS + 1
@@ -144,7 +145,7 @@ if __name__ == '__main__':
 
     sleep(0.5)
 
-    for model_name in os.listdir(os.path.expanduser(GAZEBO_MODEL_PATH)):
+    for model_name in os.listdir(os.path.expanduser(GDL_MODEL_PATH)):
 
         grasps = get_model_grasps(model_name)
 
@@ -187,6 +188,7 @@ if __name__ == '__main__':
         dataset.create_dataset("rgbd_patch_labels", (num_images, 1))
 
         for index in range(len(grasps)):
+
             print "%s / %s" % (index, len(grasps))
             grasp = grasps[index]
 

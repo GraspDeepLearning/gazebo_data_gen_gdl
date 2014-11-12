@@ -13,6 +13,7 @@ import tf
 import random
 from scipy import misc
 import h5py
+from gazebo_ros import gazebo_interface
 
 from src.gazebo_model_manager import GazeboKinectManager, GazeboModelManager
 from src.grasp import get_model_grasps
@@ -64,14 +65,23 @@ def calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manag
     u, v = xyz_to_uv((grasp_in_camera_frame.position.x, grasp_in_camera_frame.position.y, grasp_in_camera_frame.position.z))
 
     vc_uvs.append((u, v))
-    for vc in grasp.virtual_contacts:
+
+    for i in range(len(grasp.virtual_contacts)):
         pose = Pose()
-        pose.position.x = vc[0]
-        pose.position.y = vc[1]
-        pose.position.z = vc[2]
-        pose_in_camera_frame = transform_manager.transform_pose(pose, "Grasp", "Camera").pose
+        pose.position.x = grasp.virtual_contacts[i][0]
+        pose.position.y = grasp.virtual_contacts[i][1]
+        pose.position.z = grasp.virtual_contacts[i][2]
+
+        pose_in_camera_frame = transform_manager.transform_pose(pose, "Model", "World").pose
         u, v = xyz_to_uv((pose_in_camera_frame.position.x, pose_in_camera_frame.position.y, pose_in_camera_frame.position.z))
+        #model_manager.spawn_sphere("sphere-%s" % (i),
+        #                           pose_in_camera_frame.position.x,
+        #                           pose_in_camera_frame.position.y,
+        #                           pose_in_camera_frame.position.z)
         vc_uvs.append((u, v))
+
+    #for i in range(len(grasp.virtual_contacts)):
+    #    model_manager.remove_model("sphere-%s" % (i))
 
     return vc_uvs
 
@@ -147,6 +157,7 @@ if __name__ == '__main__':
 
     sleep(0.5)
 
+
     model_names = os.listdir(GDL_MODEL_PATH)
 
     for model_name in os.listdir(GDL_GRASPS_PATH):
@@ -200,14 +211,13 @@ if __name__ == '__main__':
         dataset.create_dataset("rgbd_patch_labels", (num_images, 1))
 
         for index in range(num_images):
-
             print "%s / %s grasps for %s" % (index, num_images, model_name)
             grasp = grasps[index]
 
             update_transforms(transform_manager, grasp, kinect_manager)
             grasp_in_camera_frame = transform_manager.transform_pose(grasp.pose, "Grasp", "Camera").pose
 
-            #vc_uvs is a list of (x,y,z)tuples in the camera_frame representing:
+            #vc_uvs is a list of (u,v) tuples in the camera_frame representing:
             #1)the palm,
             #2)all the virtual contacts used in graspit
             vc_uvs = calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp)

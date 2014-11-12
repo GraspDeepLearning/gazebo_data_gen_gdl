@@ -168,6 +168,22 @@ class GazeboModelManager():
 
         sleep(2)
 
+    def spawn_sphere(self, sphere_name="0", x=0, y=0, z=0):
+
+        model_xml = open(os.environ["GDL_PATH"] + "/sphere/model.sdf").read()
+        model_pose = Pose()
+        model_pose.position.x = x
+        model_pose.position.y = y
+        model_pose.position.z = z
+        robot_namespace = sphere_name
+        gazebo_interface.spawn_sdf_model_client(model_name=sphere_name,
+                                                model_xml=model_xml,
+                                                robot_namespace=robot_namespace,
+                                                initial_pose=model_pose,
+                                                reference_frame="world",
+                                                gazebo_namespace=self.gazebo_namespace)
+
+
     def does_world_contain_model(self, model_name="coke_can"):
         get_model_state_req = GetModelStateRequest()
         get_model_state_req.model_name = model_name

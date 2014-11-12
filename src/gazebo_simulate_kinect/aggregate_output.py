@@ -1,5 +1,6 @@
 import h5py
 import os
+import np
 
 GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
 
@@ -32,6 +33,19 @@ for subdir in subdirs:
     patch_shape = in_dataset['rgbd_patches'].shape[2:]
 
 
+dof_values = []
+
+for subdir in subdirs:
+
+    in_dataset_fullpath = input_directory + '/' + subdir + "/rgbd_and_labels.h5"
+    print in_dataset_fullpath
+    in_dataset = h5py.File(in_dataset_fullpath)
+
+    for i in range(in_dataset['dof_values'].shape[0]):
+        dof_values.append(np.copy(in_dataset['dof_values'][i]))
+        raise NotImplementedError
+
+
 patches_dataset_size = [num_patches*num_heatmaps_per_patch] + list(patch_shape)
 images_dataset_size = [num_images] + list(image_shape)
 patch_labels_dataset_size = [num_patches*num_heatmaps_per_patch, num_heatmaps_per_patch]
@@ -58,7 +72,7 @@ for subdir in subdirs:
     for i in range(in_dataset['rgbd_patches'].shape[0]):
         for j in range(num_heatmaps_per_patch):
             out_dataset['rgbd_patches'][patch_count] = in_dataset['rgbd_patches'][i, j]
-            out_dataset['rgbd_patch_labels'][patch_count, j] = in_dataset['rgbd_patch_labels'][i, 0]
+            out_dataset['rgbd_patch_labels'][patch_count, j] = 1#in_dataset['rgbd_patch_labels'][i, 0]
             patch_count += 1
 
     for i in range(in_dataset['rgbd'].shape[0]):

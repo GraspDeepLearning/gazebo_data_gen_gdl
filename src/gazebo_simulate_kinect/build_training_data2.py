@@ -31,7 +31,7 @@ NUM_VIRTUAL_CONTACTS = 16
 
 #the +1 is for the center of the palm.
 NUM_RGBD_PATCHES_PER_IMAGE = NUM_VIRTUAL_CONTACTS + 1
-
+NUM_DOF = 4
 
 
 def build_camera_pose_in_grasp_frame(grasp):
@@ -198,6 +198,7 @@ if __name__ == '__main__':
         dataset.create_dataset("labels", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 480, 640), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 480, 640))
         dataset.create_dataset("rgbd_patches", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4))
         dataset.create_dataset("rgbd_patch_labels", (num_images, 1))
+        dataset.create_dataset("dof_values", (num_images, NUM_DOF), chunks=(chunk_size, NUM_DOF))
 
         for index in range(num_images):
 
@@ -223,6 +224,7 @@ if __name__ == '__main__':
             dataset["rgbd_patch_labels"][index] = grasp.energy
             dataset["rgbd"][index] = np.copy(rgbd_image)
             dataset["labels"][index] = np.copy(grasp_points)
+            dataset["dof_values"][index] = np.copy(grasp.dof_values[1:])
 
             misc.imsave(output_filepath + "/" + 'overlay.png', overlay)
             misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)

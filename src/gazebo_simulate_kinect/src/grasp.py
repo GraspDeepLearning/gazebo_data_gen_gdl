@@ -4,7 +4,7 @@ import os
 from collections import namedtuple
 from geometry_msgs.msg import Pose
 
-Grasp = namedtuple('Grasp', 'energy joint_angles pose virtual_contacts')
+Grasp = namedtuple('Grasp', 'energy joint_angles dof_values pose virtual_contacts')
 
 
 def get_model_grasps(model_name):
@@ -33,6 +33,7 @@ def graspfilepath_to_grasps(graspfilepath):
 
     energy = 0
     joint_angles = []
+    dof_values = []
     pose = Pose()
     virtual_contacts = []
     reading_vcs = False
@@ -41,8 +42,8 @@ def graspfilepath_to_grasps(graspfilepath):
         if "energy: " in line:
             energy = float(line[len("energy: "):])
         elif "joint_angles: " in line:
-            joint_angles = line[len("joint_angles: "):-1]
-            joint_angles = [float(joint_angle) for joint_angle in joint_angles.split()]
+            dof_values = line[len("joint_angles: "):-1]
+            dof_values = [float(dof_value) for dof_value in dof_values.split()]
         if "jointValues: " in line:
             joint_angles = line[len("jointValues: "):-1]
             joint_angles = [float(joint_angle) for joint_angle in joint_angles.split()]
@@ -70,7 +71,7 @@ def graspfilepath_to_grasps(graspfilepath):
 
             #check if we are finished
             if len(vc_array) != 3:
-                grasps.append(Grasp(energy, joint_angles, pose, virtual_contacts))
+                grasps.append(Grasp(energy, joint_angles, dof_values, pose, virtual_contacts))
                 reading_vcs = False
                 virtual_contacts = []
 

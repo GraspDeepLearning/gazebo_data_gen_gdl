@@ -95,11 +95,6 @@ class GazeboKinectManager():
                 if rgbd_image[x, y, 3] != rgbd_image[x, y, 3]:
                     rgbd_image[x, y, 3] = max_depth
 
-        #normalize rgb:
-        rgbd_image[:, :, 0:3] = rgbd_image[:, :, 0:3]/255.0
-        #normalize d
-        rgbd_image[:, :, 3] = rgbd_image[:, :, 3]/rgbd_image[:, :, 3].max()
-
         return rgbd_image
 
     def get_model_state(self):

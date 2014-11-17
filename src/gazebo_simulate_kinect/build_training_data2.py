@@ -38,8 +38,8 @@ NUM_DOF = 4
 def build_camera_pose_in_grasp_frame(grasp):
     camera_pose = Pose()
 
-    #this will back the camera off along the approach direction 2 meters
-    camera_pose.position.z -= 2
+    #this will back the camera off along the approach direction .5 meters
+    camera_pose.position.z -= .5
 
     #the camera points along the x direction, and we need it to point along the z direction
     roll = -math.pi/2.0
@@ -58,7 +58,7 @@ def build_camera_pose_in_grasp_frame(grasp):
     return camera_pose
 
 
-def calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp):
+def calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp, graspNum):
     vc_uvs = []
 
     #this is the pixel location of the grasp point
@@ -72,16 +72,17 @@ def calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manag
         pose.position.y = grasp.virtual_contacts[i][1]
         pose.position.z = grasp.virtual_contacts[i][2]
 
-        pose_in_camera_frame = transform_manager.transform_pose(pose, "Model", "World").pose
+        pose_in_world_frame = transform_manager.transform_pose(pose, "Model", "World").pose
+        pose_in_camera_frame = transform_manager.transform_pose(pose, "Model", "Camera").pose
+
         u, v = xyz_to_uv((pose_in_camera_frame.position.x, pose_in_camera_frame.position.y, pose_in_camera_frame.position.z))
-        #model_manager.spawn_sphere("sphere-%s" % (i),
-        #                           pose_in_camera_frame.position.x,
-        #                           pose_in_camera_frame.position.y,
-        #                           pose_in_camera_frame.position.z)
+        #model_manager.spawn_sphere("sphere-%s-%s" % (graspNum, i),
+        #                           pose_in_world_frame.position.x,
+        #                           pose_in_world_frame.position.y,
+        #                           pose_in_world_frame.position.z)
         vc_uvs.append((u, v))
 
-    #for i in range(len(grasp.virtual_contacts)):
-    #    model_manager.remove_model("sphere-%s" % (i))
+    #sleep(1)
 
     return vc_uvs
 
@@ -123,9 +124,15 @@ def update_transforms(transform_manager, grasp, kinect_manager):
 
     camera_pose_in_world_frame = transform_manager.transform_pose(camera_pose_in_grasp_frame, "Grasp", "World")
 
+    #return false if the camera is below the XY plane (ie below the object)
+    if camera_pose_in_world_frame.pose.position.z < 0:
+        return False
+
     kinect_manager.set_model_state(camera_pose_in_world_frame.pose)
 
     transform_manager.add_transform(camera_pose_in_world_frame.pose, "World", "Camera")
+
+    return True
 
 
 def get_date_string():
@@ -159,6 +166,7 @@ if __name__ == '__main__':
 
 
     model_names = os.listdir(GDL_MODEL_PATH)
+    firstTime = True
 
     for model_name in os.listdir(GDL_GRASPS_PATH):
 
@@ -198,8 +206,8 @@ if __name__ == '__main__':
         print "Dataset is at: %s" % (dataset_fullfilename)
 
         num_images = len(grasps)
-        if num_images > 5:
-            num_images = 5
+        #if num_images > 7:
+        #    num_images = 7
 
         chunk_size = 10
         if num_images < 10:
@@ -212,16 +220,24 @@ if __name__ == '__main__':
         dataset.create_dataset("dof_values", (num_images, NUM_DOF), chunks=(chunk_size, NUM_DOF))
 
         for index in range(num_images):
+            if firstTime:
+                import pdb; pdb.set_trace()
+                firstTime = False
+
             print "%s / %s grasps for %s" % (index, num_images, model_name)
             grasp = grasps[index]
 
-            update_transforms(transform_manager, grasp, kinect_manager)
-            grasp_in_camera_frame = transform_manager.transform_pose(grasp.pose, "Grasp", "Camera").pose
+            if not update_transforms(transform_manager, grasp, kinect_manager):
+                print "Camera below model... skipping this grasp"
+                continue
+                # go to next index if the camera is positioned below the object
+
+            grasp_in_camera_frame = transform_manager.transform_pose(grasp.pose, "Model", "Camera").pose
 
             #vc_uvs is a list of (u,v) tuples in the camera_frame representing:
             #1)the palm,
             #2)all the virtual contacts used in graspit
-            vc_uvs = calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp)
+            vc_uvs = calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp, index)
 
             #this is a processed rgbd_image that has been normalized and any nans have been removed
             rgbd_image = np.copy(kinect_manager.get_normalized_rgbd_image())
@@ -240,5 +256,9 @@ if __name__ == '__main__':
             misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)
             misc.imsave(output_filepath + "/" + 'rgb.png', rgbd_image[:, :, 0:3])
             misc.imsave(output_filepath + "/" + 'd.png', rgbd_image[:, :, 3])
+
+            #for i in range(len(grasp.virtual_contacts)):
+            #    model_manager.remove_model("sphere-%s-%s" % (index, i))
+            #sleep(1)
 
         model_manager.remove_model(model_name)

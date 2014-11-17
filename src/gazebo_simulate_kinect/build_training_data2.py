@@ -58,32 +58,32 @@ def build_camera_pose_in_grasp_frame(grasp):
 
 
 def calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp):
-    vc_uvs = []
+    vc_uvds = []
 
     #this is the pixel location of the grasp point
-    u, v = xyz_to_uv((grasp_in_camera_frame.position.x, grasp_in_camera_frame.position.y, grasp_in_camera_frame.position.z))
+    u, v, d = xyz_to_uv((grasp_in_camera_frame.position.x, grasp_in_camera_frame.position.y, grasp_in_camera_frame.position.z))
 
-    vc_uvs.append((u, v))
+    vc_uvds.append((u, v, d))
     for vc in grasp.virtual_contacts:
         pose = Pose()
         pose.position.x = vc[0]
         pose.position.y = vc[1]
         pose.position.z = vc[2]
         pose_in_camera_frame = transform_manager.transform_pose(pose, "Grasp", "Camera").pose
-        u, v = xyz_to_uv((pose_in_camera_frame.position.x, pose_in_camera_frame.position.y, pose_in_camera_frame.position.z))
-        vc_uvs.append((u, v))
+        u, v, d = xyz_to_uv((pose_in_camera_frame.position.x, pose_in_camera_frame.position.y, pose_in_camera_frame.position.z))
+        vc_uvds.append((u, v, d))
 
-    return vc_uvs
+    return vc_uvds
 
 
-def fill_images_with_grasp_points(vc_uvs, grasp, rgbd_image):
+def fill_images_with_grasp_points(vc_uvds, grasp, rgbd_image):
 
-    grasp_points = np.zeros((len(vc_uvs), 480, 640))
+    grasp_points = np.zeros((len(vc_uvds), 480, 640))
     overlay = np.copy(rgbd_image[:, :, 0])
-    rgbd_patches = np.zeros((len(vc_uvs), 72, 72, 4))
+    rgbd_patches = np.zeros((len(vc_uvds), 72, 72, 4))
 
-    for i in range(len(vc_uvs)):
-        vc_u, vc_v = vc_uvs[i]
+    for i in range(len(vc_uvds)):
+        vc_u, vc_v, vc_d = vc_uvds[i]
         try:
             overlay[vc_u-2:vc_u+2, vc_v-2:vc_v+2] = 1.0
             grasp_points[i, vc_u, vc_v] = grasp.energy
@@ -130,7 +130,7 @@ def get_date_string():
 if __name__ == '__main__':
     saveImages = False
 
-    output_image_dir = os.path.expanduser(GDL_DATA_PATH + "/rgbd_images_%s/" % get_date_string())
+    output_image_dir = os.path.expanduser(GDL_DATA_PATH + "/rgbd_images/%s/" % get_date_string())
     sleep(2)
     models_dir = GDL_MODEL_PATH
 
@@ -199,6 +199,7 @@ if __name__ == '__main__':
         dataset.create_dataset("rgbd_patches", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4))
         dataset.create_dataset("rgbd_patch_labels", (num_images, 1))
         dataset.create_dataset("dof_values", (num_images, NUM_DOF), chunks=(chunk_size, NUM_DOF))
+        dataset.create_dataset("uvd", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 3), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 3))
 
         for index in range(num_images):
 
@@ -211,12 +212,12 @@ if __name__ == '__main__':
             #vc_uvs is a list of (x,y,z)tuples in the camera_frame representing:
             #1)the palm,
             #2)all the virtual contacts used in graspit
-            vc_uvs = calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp)
+            vc_uvds = calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp)
 
             #this is a processed rgbd_image that has been normalized and any nans have been removed
             rgbd_image = np.copy(kinect_manager.get_normalized_rgbd_image())
 
-            rgbd_patches, grasp_points, overlay = fill_images_with_grasp_points(vc_uvs, grasp, rgbd_image)
+            rgbd_patches, grasp_points, overlay = fill_images_with_grasp_points(vc_uvds, grasp, rgbd_image)
 
             output_filepath = create_save_path(model_output_image_dir, model_name, index)
 
@@ -225,6 +226,7 @@ if __name__ == '__main__':
             dataset["rgbd"][index] = np.copy(rgbd_image)
             dataset["labels"][index] = np.copy(grasp_points)
             dataset["dof_values"][index] = np.copy(grasp.dof_values[1:])
+            dataset["uvd"][index] = vc_uvds
 
             misc.imsave(output_filepath + "/" + 'overlay.png', overlay)
             misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)

@@ -87,7 +87,14 @@ class GazeboKinectManager():
                                                 gazebo_namespace=self.gazebo_namespace)
 
     def get_normalized_rgbd_image(self):
-        rgbd_image = np.copy(self.rgbd_listener.rgbd_image)
+        temp = np.copy(self.rgbd_listener.rgbd_image)
+        #correct channels
+        rgbd_image = np.zeros_like(temp)
+        rgbd_image[:, :, 0] = temp[:, :, 2]
+        rgbd_image[:, :, 1] = temp[:, :, 1]
+        rgbd_image[:, :, 2] = temp[:, :, 0]
+        rgbd_image[:, :, 3] = temp[:, :, 3]
+
         #fix nans in depth
         max_depth = np.nan_to_num(rgbd_image[:, :, 3]).max()*1.3
         for x in range(rgbd_image.shape[0]):
@@ -146,9 +153,9 @@ class GazeboModelManager():
         model_xml = open(self.models_dir + "/" + model_type + "/model.sdf").read()
         if not model_pose:
             model_pose = Pose()
-            model_pose.position.x = 2
+            model_pose.position.x = 0
             model_pose.position.y = 0
-            model_pose.position.z = 1
+            model_pose.position.z = 0
         robot_namespace = model_name
         gazebo_interface.spawn_sdf_model_client(model_name=model_name,
                                                 model_xml=model_xml,
@@ -161,11 +168,9 @@ class GazeboModelManager():
         while not self.does_world_contain_model(model_name):
             sleep(0.5)
 
-        sleep(2)
-
     def spawn_sphere(self, sphere_name="0", x=0, y=0, z=0):
 
-        model_xml = open(os.environ["GDL_PATH"] + "/sphere/model.sdf").read()
+        model_xml = open(os.environ["GDL_PATH"] + "/models/sphere/model.sdf").read()
         model_pose = Pose()
         model_pose.position.x = x
         model_pose.position.y = y

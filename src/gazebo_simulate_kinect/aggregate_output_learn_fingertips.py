@@ -2,6 +2,7 @@ import h5py
 import os
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 #the number of virtual contacts collected
 NUM_VC_IN = 17
@@ -22,6 +23,9 @@ NUM_DOF = 4
 
 #this is the number of bins for each dof of the barret hand.  These are used to classify the grasp type
 NUM_BINS = 4
+
+#two bins, for touching or not touching palm to object
+NUM_DEPTH_BINS = 2
 
 #the root data directory
 GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
@@ -47,15 +51,24 @@ INPUT_DIRECTORY = GDL_DATA_PATH + '/rgbd_images/11_17_18_38'
 #index will be
 #bin_id0*num_dof**0 + bin_id1*num_dof**1 + bin_id2*num_dof**2 + bin_id3*num_dof**3 + vc_id*num_vc**4
 #3*1 + 3*4**1 + 3*4**2 + 3*4**3 + 3* 4**4
-def get_label_index(dof_values, bin_edges_list, vc_id):
+def get_label_index(dof_values, bin_edges_list, vc_id, d):
 
     #helper function to determine what bin a data point belongs in.
     def get_bin(data_point, bin_edges):
         bin_id = 0
         for bin_edge in bin_edges:
+
+            #this will never pass on first bin_edge
             if data_point < bin_edge:
                 break
+
             bin_id += 1
+
+        bin_id -= 1
+
+        #sanity check
+        assert bin_id >= 0
+        assert bin_id < NUM_BINS
 
         return bin_id
 
@@ -68,9 +81,15 @@ def get_label_index(dof_values, bin_edges_list, vc_id):
         #this should be between 0 and 3 inclusive
         bin_id = get_bin(dof_value, bin_edges)
 
-        label_index += math.pow(bin_id, NUM_BINS-1-i)
+        label_index += bin_id * math.pow(NUM_BINS, NUM_BINS-i)
 
-    label_index += (vc_id*4**4)
+    label_index += (vc_id)
+
+    d_bin = 0
+    if d > .02:
+        d_bin = 1
+
+    label_index += d_bin * 1024
 
     return label_index
 
@@ -141,15 +160,17 @@ def init_out_dataset():
     patches_dataset_size = [num_patches*NUM_VC_OUT] + list(patch_shape)
     images_dataset_size = [num_images] + list(image_shape)
     uvd_dataset_size = [num_images, NUM_VC_OUT, 3]
-    patch_labels_dataset_size = [num_patches*NUM_VC_OUT, NUM_VC_OUT*math.pow(NUM_BINS, NUM_DOF)]
-    dof_values_dataset_size = [num_patches*NUM_VC_OUT, NUM_DOF]
+    patch_labels_dataset_size = [num_patches*NUM_VC_OUT, NUM_VC_OUT*math.pow(NUM_BINS, NUM_DOF)*NUM_DEPTH_BINS]
+    dof_values_dataset_size = [num_images, NUM_DOF]
+    palm_to_object_offset_dataset_size = [num_images, 1]
 
     #determine the size of a chunk for each dataset
     patches_chunk_size = tuple([10] + list(patch_shape))
     images_chunk_size = tuple([10] + list(image_shape))
     uvd_chunk_size = (10, NUM_VC_OUT, 3)
-    patch_labels_chunk_size = tuple([10, NUM_VC_OUT*math.pow(NUM_BINS, NUM_DOF)])
+    patch_labels_chunk_size = tuple([10, NUM_VC_OUT*math.pow(NUM_BINS, NUM_DOF)*NUM_DEPTH_BINS])
     dof_values_chunk_size = (1000, NUM_DOF)
+    palm_to_object_offset_chunk_size = (1000, 1)
 
     #initialize the datasets
     out_dataset = h5py.File("out.h5")
@@ -158,6 +179,8 @@ def init_out_dataset():
     out_dataset.create_dataset("rgbd_patch_labels",  patch_labels_dataset_size, chunks=patch_labels_chunk_size)
     out_dataset.create_dataset("dof_values", dof_values_dataset_size, chunks=dof_values_chunk_size)
     out_dataset.create_dataset("uvd", uvd_dataset_size, chunks=uvd_chunk_size)
+    out_dataset.create_dataset("palm_to_object_offset", palm_to_object_offset_dataset_size, chunks=palm_to_object_offset_chunk_size )
+    out_dataset.create_dataset("image_id", (num_patches*NUM_VC_OUT, 1), chunks=(1000, 1))
 
     return out_dataset
 
@@ -180,6 +203,9 @@ if __name__ == '__main__':
     for index in VC_INDICES:
         uvd_selector[index] = 1
 
+
+    print "need to eliminate CAMERA_BACKOFF_DISTANCE at some point"
+
     image_count = 0
     patch_count = 0
     for subdir in subdirs:
@@ -190,16 +216,21 @@ if __name__ == '__main__':
         print in_dataset_fullpath
 
         for i in range(in_dataset['rgbd_patches'].shape[0]):
+
+            out_dataset['rgbd'][image_count] = in_dataset['rgbd'][i]
+            out_dataset['uvd'][image_count] = in_dataset['uvd'][i][uvd_selector > 0]
+            out_dataset['dof_values'][image_count] = in_dataset['dof_values'][i]
+
+            u, v, d = in_dataset['uvd'][i][PALM_INDEX]
+            out_dataset['palm_to_object_offset'][image_count] = in_dataset['rgbd'][i, u, v, 3] - d
+
             for j in range(num_heatmaps_per_patch):
                 if j in VC_INDICES:
                     out_dataset['rgbd_patches'][patch_count] = in_dataset['rgbd_patches'][i, j]
-                    out_dataset['rgbd_patch_labels'][patch_count, get_label_index(in_dataset['dof_values'][i], bin_edges_list, VC_INDICES.index(j))] = 1
-                    out_dataset['dof_values'][patch_count] = in_dataset['dof_values'][i]
+                    out_dataset['rgbd_patch_labels'][patch_count, get_label_index(in_dataset['dof_values'][i], bin_edges_list, VC_INDICES.index(j), d)] = 1
+                    out_dataset['image_id'][patch_count] = image_count
                     patch_count += 1
 
-        for i in range(in_dataset['rgbd'].shape[0]):
-            out_dataset['rgbd'][image_count] = in_dataset['rgbd'][i]
-            out_dataset['uvd'][image_count] = in_dataset['uvd'][i][uvd_selector > 0]
             image_count += 1
 
     import IPython

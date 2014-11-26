@@ -218,7 +218,6 @@ if __name__ == '__main__':
             chunk_size = num_images
 
         dataset.create_dataset("rgbd", (num_images, 480, 640, 4), chunks=(chunk_size, 480, 640, 4))
-        #dataset.create_dataset("labels", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 480, 640), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 480, 640))
         dataset.create_dataset("rgbd_patches", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4))
         dataset.create_dataset("rgbd_patch_labels", (num_images, 1))
         dataset.create_dataset("dof_values", (num_images, NUM_DOF), chunks=(chunk_size, NUM_DOF))
@@ -254,7 +253,6 @@ if __name__ == '__main__':
             dataset["rgbd_patches"][index] = np.copy(rgbd_patches)
             dataset["rgbd_patch_labels"][index] = grasp.energy
             dataset["rgbd"][index] = np.copy(rgbd_image)
-            #dataset["labels"][index] = np.copy(grasp_points)
             dataset["dof_values"][index] = np.copy(grasp.dof_values[1:])
             dataset["uvd"][index] = vc_uvds
 
@@ -263,6 +261,7 @@ if __name__ == '__main__':
                 misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)
                 misc.imsave(output_filepath + "/" + 'rgb.png', rgbd_image[:, :, 0:3])
                 misc.imsave(output_filepath + "/" + 'd.png', rgbd_image[:, :, 3])
+
 
             #for i in range(len(grasp.virtual_contacts)):
             #   model_manager.remove_model("sphere-%s-%s" % (index, i))

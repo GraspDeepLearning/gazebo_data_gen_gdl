@@ -5,7 +5,7 @@ import math
 import matplotlib.pyplot as plt
 
 #the number of virtual contacts collected
-NUM_VC_IN = 17
+NUM_VC_IN = 8
 
 #the number of virtual contacts we actually want to keep.
 #most likely just palm and fingertips
@@ -13,9 +13,15 @@ NUM_VC_OUT = 4
 
 #this are the indices for the virtual contacts we want to keep
 PALM_INDEX = 0
-FINGER_1_INDEX = 8
-FINGER_2_INDEX = 12
-FINGER_3_INDEX = 16
+# for 16 vc grasps
+# FINGER_1_INDEX = 8
+# FINGER_2_INDEX = 12
+# FINGER_3_INDEX = 16
+
+#for 7 vc grasps
+FINGER_1_INDEX = 5
+FINGER_2_INDEX = 6
+FINGER_3_INDEX = 7
 VC_INDICES = [PALM_INDEX, FINGER_1_INDEX, FINGER_2_INDEX, FINGER_3_INDEX]
 
 #number of degrees of freedom for the hand
@@ -31,7 +37,7 @@ NUM_DEPTH_BINS = 2
 GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
 
 #the directory we are going to pull all the h5 files from.
-INPUT_DIRECTORY = GDL_DATA_PATH + '/rgbd_images/11_17_18_38'
+INPUT_DIRECTORY = GDL_DATA_PATH + '/rgbd_images/11_20_16_46'
 
 
 #we have NUM_VC * NUM_BINS**NUM_DOF different labels
@@ -108,7 +114,7 @@ def get_data_dimensions(subdirs):
 
     for subdir in subdirs:
 
-        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/rgbd_and_labels.h5"
+        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/no_labels.h5"
         in_dataset = h5py.File(in_dataset_fullpath)
 
         num_patches += in_dataset['rgbd_patches'].shape[0]
@@ -135,7 +141,7 @@ def get_histogram_for_dof_values(subdirs):
     current = 0
     for subdir in subdirs:
 
-        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/rgbd_and_labels.h5"
+        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/no_labels.h5"
         print in_dataset_fullpath
         in_dataset = h5py.File(in_dataset_fullpath)
 
@@ -204,13 +210,11 @@ if __name__ == '__main__':
         uvd_selector[index] = 1
 
 
-    print "need to eliminate CAMERA_BACKOFF_DISTANCE at some point"
-
     image_count = 0
     patch_count = 0
     for subdir in subdirs:
 
-        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/rgbd_and_labels.h5"
+        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/no_labels.h5"
         in_dataset = h5py.File(in_dataset_fullpath)
 
         print in_dataset_fullpath

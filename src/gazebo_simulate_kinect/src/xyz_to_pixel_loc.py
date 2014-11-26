@@ -16,5 +16,5 @@ def xyz_to_uv(point_in_camera_frame):
     u = 480 - u
 
     #u and v are indices into the image
-    return u, v, d
+    return u, v, z
 

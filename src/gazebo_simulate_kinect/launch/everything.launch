@@ -5,7 +5,7 @@
   <include file="$(find gazebo_simulate_kinect)/launch/init_world.launch"/>
 
   <!-- Collect synthetic data -->
- <node name="data_gen" pkg="gazebo_simulate_kinect" type="build_training_data2.py" />
+ <node name="data_gen" pkg="gazebo_simulate_kinect" type="build_training_data.py" />
 
 
 </launch>

@@ -87,16 +87,10 @@ class GazeboKinectManager():
                                                 gazebo_namespace=self.gazebo_namespace)
 
     def get_normalized_rgbd_image(self):
-        temp = np.copy(self.rgbd_listener.rgbd_image)
-        #correct channels
-        rgbd_image = np.zeros_like(temp)
-        rgbd_image[:, :, 0] = temp[:, :, 2]
-        rgbd_image[:, :, 1] = temp[:, :, 1]
-        rgbd_image[:, :, 2] = temp[:, :, 0]
-        rgbd_image[:, :, 3] = temp[:, :, 3]
+        rgbd_image = np.copy(self.rgbd_listener.rgbd_image)
 
         #fix nans in depth
-        max_depth = np.nan_to_num(rgbd_image[:, :, 3]).max()*1.3
+        max_depth = np.nan_to_num(rgbd_image[:, :, 3]).max()*1.3 + 5.0
         for x in range(rgbd_image.shape[0]):
             for y in range(rgbd_image.shape[1]):
                 if rgbd_image[x, y, 3] != rgbd_image[x, y, 3]:

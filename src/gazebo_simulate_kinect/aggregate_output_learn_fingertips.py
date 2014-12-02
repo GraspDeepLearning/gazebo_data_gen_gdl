@@ -114,7 +114,7 @@ def get_data_dimensions(subdirs):
 
     for subdir in subdirs:
 
-        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/no_labels.h5"
+        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/rgbd_and_labels.h5"
         in_dataset = h5py.File(in_dataset_fullpath)
 
         num_patches += in_dataset['rgbd_patches'].shape[0]
@@ -141,7 +141,7 @@ def get_histogram_for_dof_values(subdirs):
     current = 0
     for subdir in subdirs:
 
-        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/no_labels.h5"
+        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/rgbd_and_labels.h5"
         print in_dataset_fullpath
         in_dataset = h5py.File(in_dataset_fullpath)
 
@@ -214,7 +214,7 @@ if __name__ == '__main__':
     patch_count = 0
     for subdir in subdirs:
 
-        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/no_labels.h5"
+        in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/rgbd_and_labels.h5"
         in_dataset = h5py.File(in_dataset_fullpath)
 
         print in_dataset_fullpath

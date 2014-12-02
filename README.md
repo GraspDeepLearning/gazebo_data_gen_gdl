@@ -20,7 +20,6 @@ Cleaning up h5's:
 
 __Note: make sure to change the dataset location in each of the following .py's mentioned__
 
-* Run ```repack.py``` in *src/gazebo_simulate_kinnect*. (IS THIS NECESSARY?)
 * Run ```aggregate_output_learn_fingertips.py``` in *src/gazebo_simulate_kinnect*.  Bins all of the h5 grasps, and aggregates into one single h5 file (```out.h5```).
 * Run ```condense_labels.py``` in *src/gazebo_simulate_kinnect*. Throws away empty and small bins of grasp types. Outputs into ```out_condensed.h5```.
 

@@ -35,11 +35,11 @@ NUM_RGBD_PATCHES_PER_IMAGE = NUM_VIRTUAL_CONTACTS + 1
 NUM_DOF = 4
 
 
-def build_camera_pose_in_grasp_frame(grasp):
+def build_camera_pose_in_grasp_frame(grasp, cameraDist):
     camera_pose = Pose()
 
-    #this will back the camera off along the approach direction 1.5 meters
-    camera_pose.position.z -= 1.5
+    #this will back the camera off along the approach direction 'cameraDist' meters
+    camera_pose.position.z -= cameraDist
 
     #the camera points along the x direction, and we need it to point along the z direction
     roll = -math.pi/2.0
@@ -121,10 +121,10 @@ def create_save_path(model_output_image_dir, model_name, index ):
     return output_filepath
 
 
-def update_transforms(transform_manager, grasp, kinect_manager):
+def update_transforms(transform_manager, grasp, kinect_manager, cameraDist):
     transform_manager.add_transform(grasp.pose, "Model", "Grasp")
 
-    camera_pose_in_grasp_frame = build_camera_pose_in_grasp_frame(grasp)
+    camera_pose_in_grasp_frame = build_camera_pose_in_grasp_frame(grasp, cameraDist)
 
     camera_pose_in_world_frame = transform_manager.transform_pose(camera_pose_in_grasp_frame, "Grasp", "World")
 
@@ -150,8 +150,9 @@ def get_date_string():
 
 if __name__ == '__main__':
     saveImages = False
+    cameraDist = 1.5
 
-    output_image_dir = os.path.expanduser(GDL_DATA_PATH + "/rgbd_images/%s/" % get_date_string())
+    output_image_dir = os.path.expanduser(GDL_DATA_PATH + "/rgbd_images/%sm-%s/" % (str(cameraDist), get_date_string()))
     sleep(2)
     models_dir = GDL_MODEL_PATH
 
@@ -231,7 +232,7 @@ if __name__ == '__main__':
             print "%s / %s grasps for %s" % (index, num_images, model_name)
             grasp = grasps[index]
 
-            if not update_transforms(transform_manager, grasp, kinect_manager):
+            if not update_transforms(transform_manager, grasp, kinect_manager, cameraDist):
                 print "Camera below model... skipping this grasp"
                 continue
                 # go to next index if the camera is positioned below the object

@@ -77,15 +77,12 @@ def calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manag
         pose_in_world_frame = transform_manager.transform_pose(pose, "Model", "World").pose
         pose_in_camera_frame = transform_manager.transform_pose(pose, "Model", "Camera").pose
 
-        u, v, d= xyz_to_uv((pose_in_camera_frame.position.x, pose_in_camera_frame.position.y, pose_in_camera_frame.position.z))
+        u, v, d = xyz_to_uv((pose_in_camera_frame.position.x, pose_in_camera_frame.position.y, pose_in_camera_frame.position.z))
         #model_manager.spawn_sphere("sphere-%s-%s" % (graspNum, i),
         #                          pose_in_world_frame.position.x,
         #                          pose_in_world_frame.position.y,
         #                          pose_in_world_frame.position.z)
         vc_uvds.append((u, v, d))
-
-    #import IPython
-    #IPython.embed()
 
     #sleep(1)
 

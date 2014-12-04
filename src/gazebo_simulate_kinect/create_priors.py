@@ -5,7 +5,7 @@ import scipy.ndimage
 import os
 
 dataset = h5py.File(os.path.expanduser('~/grasp_deep_learning/data/unprocessed_training_data/gdl_7vc.h5'))
-priors_dataset = h5py.File('gdl_7vc_priors.h5')
+priors_dataset = h5py.File('1.5_gdl_7vc_priors.h5')
 
 NUM_GRASP_TYPES = 4*4*4*4
 NUM_VC = dataset['uvd'].shape[1]

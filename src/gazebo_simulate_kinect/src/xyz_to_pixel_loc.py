@@ -8,13 +8,13 @@ k = k.reshape((3, 3))
 def xyz_to_uv(point_in_camera_frame):
     point_xz_flipped = np.array([point_in_camera_frame[2], point_in_camera_frame[1], point_in_camera_frame[0]])
     z = point_xz_flipped[2]
-    point_norm = point_xz_flipped/z*1.0
-    u, v, d = np.dot(k, point_norm.T)
+    point_norm = point_xz_flipped/(z*1.0)
+    u, v, _ = np.dot(k, point_norm.T)
 
     v = 640 - v
     #u = 240 + 480 - u
     u = 480 - u
 
     #u and v are indices into the image
-    return u, v, d
+    return u, v, z
 

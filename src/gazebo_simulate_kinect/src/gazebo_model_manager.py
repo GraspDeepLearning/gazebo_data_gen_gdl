@@ -96,7 +96,7 @@ class GazeboKinectManager():
         rgbd_image[:, :, 3] = temp[:, :, 3]
 
         #fix nans in depth
-        max_depth = np.nan_to_num(rgbd_image[:, :, 3]).max()*1.3
+        max_depth = np.nan_to_num(rgbd_image[:, :, 3]).max()*1.3 + 5.0
         for x in range(rgbd_image.shape[0]):
             for y in range(rgbd_image.shape[1]):
                 if rgbd_image[x, y, 3] != rgbd_image[x, y, 3]:

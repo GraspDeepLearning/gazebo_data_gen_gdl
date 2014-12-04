@@ -153,7 +153,7 @@ def init_out_dataset():
     patches_dataset_size = [num_patches*NUM_VC_OUT] + list(patch_shape)
     images_dataset_size = [num_images] + list(image_shape)
     uvd_dataset_size = [num_images, NUM_VC_OUT, 3]
-    patch_labels_dataset_size = [num_patches*NUM_VC_OUT, NUM_VC_OUT*math.pow(NUM_DOF_BINS, NUM_DOF)*NUM_DEPTH_BINS]
+    patch_labels_dataset_size = [num_patches*NUM_VC_OUT, num_labels]
     dof_values_dataset_size = [num_images, NUM_DOF]
     palm_to_object_offset_dataset_size = [num_images, 1]
 
@@ -161,7 +161,7 @@ def init_out_dataset():
     patches_chunk_size = tuple([10] + list(patch_shape))
     images_chunk_size = tuple([10] + list(image_shape))
     uvd_chunk_size = (10, NUM_VC_OUT, 3)
-    patch_labels_chunk_size = tuple([10, NUM_VC_OUT*math.pow(NUM_DOF_BINS, NUM_DOF)*NUM_DEPTH_BINS])
+    patch_labels_chunk_size = tuple([10, num_labels])
     dof_values_chunk_size = (1000, NUM_DOF)
     palm_to_object_offset_chunk_size = (1000, 1)
 

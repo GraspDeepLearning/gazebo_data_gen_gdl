@@ -175,7 +175,7 @@ def init_out_dataset():
     out_dataset.create_dataset("palm_to_object_offset", palm_to_object_offset_dataset_size, chunks=palm_to_object_offset_chunk_size )
 
     #the id of the image that this patch comes from
-    out_dataset.create_dataset("image_id", (num_patches*NUM_VC_OUT, 1), chunks=(1000, 1))
+    out_dataset.create_dataset("patch_image_id", (num_patches*NUM_VC_OUT, 1), chunks=(1000, 1))
     #the id of the grasp type that this patch is for
     out_dataset.create_dataset("patch_grasp_type_id", (num_patches*NUM_VC_OUT, 1))
     #the id of the virtual contact that this patch is for
@@ -184,28 +184,7 @@ def init_out_dataset():
     return out_dataset
 
 
-if __name__ == '__main__':
-
-    subdirs = os.listdir(INPUT_DIRECTORY)
-
-    #quickly run through the input directory to determine the values for several variables
-    num_images, num_patches, image_shape, patch_shape, num_heatmaps_per_patch = get_data_dimensions(subdirs)
-
-    num_grasp_types = get_num_grasp_types()
-    num_labels = num_grasp_types*NUM_VC_OUT
-
-    #run through the dof values for all the grasps to determine the number of different
-    #grasp categories.
-    hist_list, bin_edges_list = get_histogram_for_dof_values(subdirs)
-
-    #initialize the h5 dataset we are going to create
-    out_dataset = init_out_dataset()
-
-    uvd_selector = np.zeros(NUM_VC_IN)
-    for index in VC_INDICES:
-        uvd_selector[index] = 1
-
-
+def build_dataset():
     image_count = 0
     patch_count = 0
     for subdir in subdirs:
@@ -238,12 +217,85 @@ if __name__ == '__main__':
 
                     out_dataset['rgbd_patches'][patch_count] = in_dataset['rgbd_patches'][i, j]
                     out_dataset['rgbd_patch_labels'][patch_count, grasp_full_label] = 1
-                    out_dataset['image_id'][patch_count] = image_count
+                    out_dataset['patch_image_id'][patch_count] = image_count
                     out_dataset['patch_grasp_type_id'] = grasp_type_id
                     out_dataset['patch_vc_id'][patch_count] = vc_id
                     patch_count += 1
 
             image_count += 1
+
+
+#now we are going to condense the dataset to only include grasps that have a reasonably large number of examples
+#this will remove lots of the labels that do not actually correspond to feasible grasps.
+def condense_dataset():
+
+    grasp_types = out_dataset['patch_grasp_type_id'][:]
+
+    counts = np.zeros(num_grasp_types + 1)
+    for grasp_type_id in grasp_types:
+            counts[grasp_type_id] += 1
+
+    count_mask = counts > 10
+
+    #this is the number of grasps that we have more than 10 training examples of
+    num_condensed_grasp_types = sum(count_mask)
+    num_condensed_labels = num_condensed_grasp_types*NUM_VC_OUT
+
+    #we are getting rid of patches that belong to grasps that we have less than 10 training examples for
+    #we are now going to figure out how many good patches we still have and also a mapping from label to condensed label.
+    num_condensed_patches = 0
+    grasp_type_to_condensed_grasp_type = {}
+    for grasp_type in grasp_types:
+        if count_mask[grasp_type]:
+            grasp_type_to_condensed_grasp_type[grasp_type] = num_condensed_patches
+            num_condensed_patches += 1
+
+    condensed_dataset = h5py.File("out_condensed.h5")
+    condensed_dataset.create_dataset('rgbd_patches', (num_condensed_patches, image_shape[0], image_shape[1], image_shape[2]), chunks=(10, image_shape[0], image_shape[1], image_shape[2]))
+    condensed_dataset.create_dataset('rgbd_patch_labels', (num_condensed_patches, num_condensed_labels), chunks=(1000, num_condensed_labels))
+
+    current_index = 0
+    for i in range(grasp_types.shape[0]):
+        grasp_type = grasp_types[i]
+        vc_id = out_dataset['patch_vc_id'][i]
+
+        if grasp_type in grasp_type_to_condensed_grasp_type:
+
+            condensed_grasp_type = grasp_type_to_condensed_grasp_type[grasp_type]
+            label = condensed_grasp_type*NUM_VC_OUT + vc_id
+            label_array = np.zeros(num_condensed_labels)
+            label_array[label] = 1
+            condense_dataset['rgbd_patches'][current_index] = out_dataset['rgbd_patches'][i]
+            condense_dataset['rgbd_patches'][current_index] = label_array
+
+            current_index += 1
+
+
+if __name__ == '__main__':
+
+    subdirs = os.listdir(INPUT_DIRECTORY)
+
+    #quickly run through the input directory to determine the values for several variables
+    num_images, num_patches, image_shape, patch_shape, num_heatmaps_per_patch = get_data_dimensions(subdirs)
+
+    num_grasp_types = get_num_grasp_types()
+    num_labels = num_grasp_types*NUM_VC_OUT
+
+    #run through the dof values for all the grasps to determine the number of different
+    #grasp categories.
+    hist_list, bin_edges_list = get_histogram_for_dof_values(subdirs)
+
+    #initialize the h5 dataset we are going to create
+    out_dataset = init_out_dataset()
+
+    uvd_selector = np.zeros(NUM_VC_IN)
+    for index in VC_INDICES:
+        uvd_selector[index] = 1
+
+    build_dataset()
+    condense_dataset()
+
+
 
     import IPython
     IPython.embed()

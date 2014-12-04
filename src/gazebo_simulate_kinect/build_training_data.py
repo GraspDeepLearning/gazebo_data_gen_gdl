@@ -28,18 +28,18 @@ GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
 GDL_GRASPS_PATH = os.environ["GDL_GRASPS_PATH"]
 GDL_MODEL_PATH = os.environ["GDL_MODEL_PATH"] + "/big_bird_models_processed"
 
-NUM_VIRTUAL_CONTACTS = 16
+NUM_VIRTUAL_CONTACTS = 7
 
 #the +1 is for the center of the palm.
 NUM_RGBD_PATCHES_PER_IMAGE = NUM_VIRTUAL_CONTACTS + 1
 NUM_DOF = 4
 
 
-def build_camera_pose_in_grasp_frame(grasp):
+def build_camera_pose_in_grasp_frame(grasp, cameraDist):
     camera_pose = Pose()
 
-    #this will back the camera off along the approach direction .5 meters
-    camera_pose.position.z -= .5
+    #this will back the camera off along the approach direction 'cameraDist' meters
+    camera_pose.position.z -= cameraDist
 
     #the camera points along the x direction, and we need it to point along the z direction
     roll = -math.pi/2.0
@@ -78,9 +78,9 @@ def calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manag
 
         u, v, d = xyz_to_uv((pose_in_camera_frame.position.x, pose_in_camera_frame.position.y, pose_in_camera_frame.position.z))
         #model_manager.spawn_sphere("sphere-%s-%s" % (graspNum, i),
-        #                           pose_in_world_frame.position.x,
-        #                           pose_in_world_frame.position.y,
-        #                           pose_in_world_frame.position.z)
+        #                          pose_in_world_frame.position.x,
+        #                          pose_in_world_frame.position.y,
+        #                          pose_in_world_frame.position.z)
         vc_uvds.append((u, v, d))
 
     #sleep(1)
@@ -118,10 +118,10 @@ def create_save_path(model_output_image_dir, model_name, index ):
     return output_filepath
 
 
-def update_transforms(transform_manager, grasp, kinect_manager):
+def update_transforms(transform_manager, grasp, kinect_manager, cameraDist):
     transform_manager.add_transform(grasp.pose, "Model", "Grasp")
 
-    camera_pose_in_grasp_frame = build_camera_pose_in_grasp_frame(grasp)
+    camera_pose_in_grasp_frame = build_camera_pose_in_grasp_frame(grasp, cameraDist)
 
     camera_pose_in_world_frame = transform_manager.transform_pose(camera_pose_in_grasp_frame, "Grasp", "World")
 
@@ -147,8 +147,9 @@ def get_date_string():
 
 if __name__ == '__main__':
     saveImages = False
+    cameraDist = 1.5
 
-    output_image_dir = os.path.expanduser(GDL_DATA_PATH + "/rgbd_images/%s/" % get_date_string())
+    output_image_dir = os.path.expanduser(GDL_DATA_PATH + "/rgbd_images/%sm-%s/" % (str(cameraDist), get_date_string()))
     sleep(2)
     models_dir = GDL_MODEL_PATH
 
@@ -228,7 +229,7 @@ if __name__ == '__main__':
             print "%s / %s grasps for %s" % (index, num_images, model_name)
             grasp = grasps[index]
 
-            if not update_transforms(transform_manager, grasp, kinect_manager):
+            if not update_transforms(transform_manager, grasp, kinect_manager, cameraDist):
                 print "Camera below model... skipping this grasp"
                 continue
                 # go to next index if the camera is positioned below the object
@@ -253,10 +254,15 @@ if __name__ == '__main__':
             dataset["dof_values"][index] = np.copy(grasp.dof_values[1:])
             dataset["uvd"][index] = vc_uvds
 
-            misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)
+            if index % 100 == 0:
+                misc.imsave(output_filepath + "/" + 'overlay.png', overlay)
+                misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)
+                misc.imsave(output_filepath + "/" + 'rgb.png', rgbd_image[:, :, 0:3])
+                misc.imsave(output_filepath + "/" + 'd.png', rgbd_image[:, :, 3])
+
 
             #for i in range(len(grasp.virtual_contacts)):
-            #    model_manager.remove_model("sphere-%s-%s" % (index, i))
-            #sleep(1)
+            #   model_manager.remove_model("sphere-%s-%s" % (index, i))
+            sleep(1)
 
         model_manager.remove_model(model_name)

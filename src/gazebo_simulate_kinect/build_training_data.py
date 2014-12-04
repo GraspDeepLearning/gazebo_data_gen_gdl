@@ -33,6 +33,7 @@ NUM_VIRTUAL_CONTACTS = 7
 #the +1 is for the center of the palm.
 NUM_RGBD_PATCHES_PER_IMAGE = NUM_VIRTUAL_CONTACTS + 1
 NUM_DOF = 4
+PATCH_SIZE = 170
 
 
 def build_camera_pose_in_grasp_frame(grasp, cameraDist):
@@ -95,14 +96,14 @@ def fill_images_with_grasp_points(vc_uvds, grasp, rgbd_image):
 
     grasp_points = np.zeros((len(vc_uvds), 480, 640))
     overlay = np.copy(rgbd_image[:, :, 0])
-    rgbd_patches = np.zeros((len(vc_uvds), 72, 72, 4))
+    rgbd_patches = np.zeros((len(vc_uvds), PATCH_SIZE, PATCH_SIZE, 4))
 
     for i in range(len(vc_uvds)):
         vc_u, vc_v, vc_d = vc_uvds[i]
         try:
             overlay[vc_u-2:vc_u+2, vc_v-2:vc_v+2] = 1.0
             grasp_points[i, vc_u, vc_v] = grasp.energy
-            rgbd_patches[i] = rgbd_image[vc_u-36:vc_u+36, vc_v-36:vc_v+36, :]
+            rgbd_patches[i] = rgbd_image[vc_u-PATCH_SIZE/2:vc_u+PATCH_SIZE/2, vc_v-PATCH_SIZE/2:vc_v+PATCH_SIZE/2, :]
         except Exception as e:
             print "u,v probably outside of image"
             print e
@@ -150,7 +151,7 @@ def get_date_string():
 
 if __name__ == '__main__':
     saveImages = False
-    cameraDist = 1.5
+    cameraDist = 2.0
 
     output_image_dir = os.path.expanduser(GDL_DATA_PATH + "/rgbd_images/%sm-%s/" % (str(cameraDist), get_date_string()))
     sleep(2)
@@ -218,11 +219,15 @@ if __name__ == '__main__':
         if num_images < 10:
             chunk_size = num_images
 
-        dataset.create_dataset("rgbd", (num_images, 480, 640, 4), chunks=(chunk_size, 480, 640, 4))
-        dataset.create_dataset("rgbd_patches", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 72, 72, 4))
-        dataset.create_dataset("rgbd_patch_labels", (num_images, 1))
-        dataset.create_dataset("dof_values", (num_images, NUM_DOF), chunks=(chunk_size, NUM_DOF))
-        dataset.create_dataset("uvd", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 3), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 3))
+        dataset.create_dataset("rgbd_temp", (num_images, 480, 640, 4), chunks=(chunk_size, 480, 640, 4))
+        dataset.create_dataset("rgbd_patches_temp", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4))
+        dataset.create_dataset("rgbd_patch_labels_temp", (num_images, 1))
+        dataset.create_dataset("dof_values_temp", (num_images, NUM_DOF), chunks=(chunk_size, NUM_DOF))
+        dataset.create_dataset("uvd_temp", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 3), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 3))
+
+        dataset_index = 0
+
+        print "Running %s..." % model_name
 
         for index in range(num_images):
             if firstTime:
@@ -251,21 +256,48 @@ if __name__ == '__main__':
 
             output_filepath = create_save_path(model_output_image_dir, model_name, index)
 
-            dataset["rgbd_patches"][index] = np.copy(rgbd_patches)
-            dataset["rgbd_patch_labels"][index] = grasp.energy
-            dataset["rgbd"][index] = np.copy(rgbd_image)
-            dataset["dof_values"][index] = np.copy(grasp.dof_values[1:])
-            dataset["uvd"][index] = vc_uvds
 
-            if index % 100 == 0:
+            if index % 100 == 0 or saveImages:
                 misc.imsave(output_filepath + "/" + 'overlay.png', overlay)
                 misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)
                 misc.imsave(output_filepath + "/" + 'rgb.png', rgbd_image[:, :, 0:3])
                 misc.imsave(output_filepath + "/" + 'd.png', rgbd_image[:, :, 3])
 
+            
+            dataset["rgbd_patches_temp"][dataset_index] = np.copy(rgbd_patches)
+            dataset["rgbd_patch_labels_temp"][dataset_index] = grasp.energy
+            dataset["rgbd_temp"][dataset_index] = np.copy(rgbd_image)
+            dataset["dof_values_temp"][dataset_index] = np.copy(grasp.dof_values[1:])
+            dataset["uvd_temp"][dataset_index] = vc_uvds
+            dataset_index += 1
 
             #for i in range(len(grasp.virtual_contacts)):
             #   model_manager.remove_model("sphere-%s-%s" % (index, i))
-            sleep(1)
+            #sleep(1)
+
+        dataset_size = dataset_index
+        chunk_size = 10    
+
+        if dataset_size < 10:
+            chunk_size = dataset_size
+
+        dataset.create_dataset("rgbd", (dataset_size, 480, 640, 4), chunks=(chunk_size, 480, 640, 4))
+        dataset.create_dataset("rgbd_patches", (dataset_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4))
+        dataset.create_dataset("rgbd_patch_labels", (dataset_size, 1))
+        dataset.create_dataset("dof_values", (dataset_size, NUM_DOF), chunks=(chunk_size, NUM_DOF))
+        dataset.create_dataset("uvd", (dataset_size, NUM_RGBD_PATCHES_PER_IMAGE, 3), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 3))
+        for i in range(dataset_size):
+            dataset["rgbd"][i] = dataset["rgbd_temp"][i]
+            dataset["rgbd_patches"][i] = dataset["rgbd_patches_temp"][i]
+            dataset["rgbd_patch_labels"][i] = dataset["rgbd_patch_labels_temp"][i]
+            dataset["dof_values"][i] = dataset["dof_values_temp"][i]
+            dataset["uvd"][i] = dataset["uvd_temp"][i]
+
+        del dataset["rgbd_temp"]
+        del dataset["rgbd_patches_temp"]
+        del dataset["rgbd_patch_labels_temp"]
+        del dataset["dof_values_temp"]
+        del dataset["uvd_temp"]
+
 
         model_manager.remove_model(model_name)

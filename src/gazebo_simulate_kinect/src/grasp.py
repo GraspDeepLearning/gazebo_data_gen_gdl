@@ -41,6 +41,7 @@ def graspfilepath_to_grasps(graspfilepath):
     for line in f.readlines():
         if "energy: " in line:
             energy = float(line[len("energy: "):])
+        #these are dof values
         elif "joint_angles: " in line:
             dof_values = line[len("joint_angles: "):-1]
             dof_values = [float(dof_value) for dof_value in dof_values.split()]

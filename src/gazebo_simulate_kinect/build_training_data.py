@@ -32,7 +32,7 @@ NUM_VIRTUAL_CONTACTS = 7
 
 #the +1 is for the center of the palm.
 NUM_RGBD_PATCHES_PER_IMAGE = NUM_VIRTUAL_CONTACTS + 1
-NUM_DOF = 4
+NUM_DOF = 5
 PATCH_SIZE = 170
 
 
@@ -42,12 +42,27 @@ def build_camera_pose_in_grasp_frame(grasp, cameraDist):
     #this will back the camera off along the approach direction 'cameraDist' meters
     camera_pose.position.z -= cameraDist
 
+    # quaternion = (grasp.pose.orientation.x, grasp.pose.orientation.y,grasp.pose.orientation.z,grasp.pose.orientation.w)
+    # quaternion_inverse = tf.transformations.quaternion_inverse(quaternion)
+
+    # r,p,y = tf.transformations.euler_from_quaternion(quaternion_inverse)
+
     #the camera points along the x direction, and we need it to point along the z direction
-    roll = -math.pi/2.0
+    roll = 0
     pitch = -math.pi/2.0
 
     # rotate so that camera is upright.
-    yaw = -math.pi/2.0 + grasp.joint_angles[1]
+    yaw = 0#-math.pi/2.0 + grasp.joint_angles[0]
+
+
+
+    # #rotation matrix from grasp to model rather than model to grasp.
+    # quaternion_inverse = tf.transformations.quaternion_inverse(*grasp.pose.orientation)
+    # q= quaternion_inverse
+
+    # yaw = math.atan2(2.0*(q.y*q.z + q.w*q.x), q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z)
+    # #for intrinsic rotation
+    # alpha, _, _ = tf.transformations.euler_from_quaternion(*quaternion_inverse,'szyx')
 
     quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
 
@@ -109,15 +124,12 @@ def fill_images_with_grasp_points(vc_uvds, grasp, rgbd_image):
 
 
 def create_save_path(model_output_image_dir, model_name, index ):
-    output_filepath = model_output_image_dir + model_name + "_" + str(index)
-    if not os.path.exists(output_filepath):
-        os.makedirs(output_filepath)
+    #output_filepath = model_output_image_dir + model_name + "_" + str(index)
+    #if not os.path.exists(output_filepath):
+    #    os.makedirs(output_filepath)
 
     if not os.path.exists(model_output_image_dir + "overlays"):
         os.makedirs(model_output_image_dir + "overlays")
-
-    return output_filepath
-
 
 def update_transforms(transform_manager, grasp, kinect_manager, cameraDist):
     transform_manager.add_transform(grasp.pose, "Model", "Grasp")
@@ -125,6 +137,36 @@ def update_transforms(transform_manager, grasp, kinect_manager, cameraDist):
     camera_pose_in_grasp_frame = build_camera_pose_in_grasp_frame(grasp, cameraDist)
 
     camera_pose_in_world_frame = transform_manager.transform_pose(camera_pose_in_grasp_frame, "Grasp", "World")
+    grasp_pose_in_world_frame = transform_manager.transform_pose(grasp.pose, "Model", "World")
+
+    #look at these as two points in world coords, ignoring rotations
+    dx = camera_pose_in_world_frame.pose.position.x - grasp_pose_in_world_frame.pose.position.x
+    dy = camera_pose_in_world_frame.pose.position.y - grasp_pose_in_world_frame.pose.position.y
+    dz = camera_pose_in_world_frame.pose.position.z - grasp_pose_in_world_frame.pose.position.z
+
+    #first find angle around world z to orient camera towards object
+    rot = math.atan2(dy,dx)
+
+    #now find angle to tilt camera down towards object
+    dist_in_xy_plane = math.hypot(dx,dy)
+    tilt = math.atan2(dz, dist_in_xy_plane)
+
+    #now find rpy to rotate camera from 0,0,0,0 to rot, tilt
+
+    roll = 0
+    #make sure the camera is tilted up or down to center the palm vertically
+    pitch = tilt
+    #this centers the object in the x,y world plane. by rotating around world's z axis
+    yaw = rot +  math.pi
+
+    quaternion = tf.transformations.quaternion_from_euler(roll,pitch,yaw)
+
+
+    camera_pose_in_world_frame.pose.orientation.x =  quaternion[0]
+    camera_pose_in_world_frame.pose.orientation.y = quaternion[1]
+    camera_pose_in_world_frame.pose.orientation.z = quaternion[2]
+    camera_pose_in_world_frame.pose.orientation.w = quaternion[3]
+
 
     #return false if the camera is below the XY plane (ie below the object)
     if camera_pose_in_world_frame.pose.position.z < 0:
@@ -200,7 +242,7 @@ if __name__ == '__main__':
         model_pose_in_world_frame = model_manager.get_model_state(model_name).pose
         transform_manager.add_transform(model_pose_in_world_frame, "World", "Model")
 
-        dataset_fullfilename = model_output_image_dir + "rgbd_and_labels.h5"
+        dataset_fullfilename = model_output_image_dir + "rgbd_and_labels_temp.h5"
 
         if os.path.isfile(dataset_fullfilename):
             os.remove(dataset_fullfilename)
@@ -220,6 +262,8 @@ if __name__ == '__main__':
         dataset.create_dataset("rgbd_patches_temp", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4))
         dataset.create_dataset("rgbd_patch_labels_temp", (num_images, 1))
         dataset.create_dataset("dof_values_temp", (num_images, NUM_DOF), chunks=(chunk_size, NUM_DOF))
+        dataset.create_dataset("palm_pose_temp", (num_images, 7  ), chunks=(chunk_size, 7))
+        dataset.create_dataset("joint_values_temp", (num_images, 8  ), chunks=(chunk_size, 8))
         dataset.create_dataset("uvd_temp", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 3), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 3))
 
         dataset_index = 0
@@ -249,22 +293,30 @@ if __name__ == '__main__':
             #this is a processed rgbd_image that has been normalized and any nans have been removed
             rgbd_image = np.copy(kinect_manager.get_normalized_rgbd_image())
 
+            #import IPython
+            #IPython.embed()
+
             rgbd_patches, grasp_points, overlay = fill_images_with_grasp_points(vc_uvds, grasp, rgbd_image)
 
-            output_filepath = create_save_path(model_output_image_dir, model_name, index)
-
-
-            if index % 100 == 0 or saveImages:
-                misc.imsave(output_filepath + "/" + 'overlay.png', overlay)
-                misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)
-                misc.imsave(output_filepath + "/" + 'rgb.png', rgbd_image[:, :, 0:3])
-                misc.imsave(output_filepath + "/" + 'd.png', rgbd_image[:, :, 3])
+            grasp_pose_array = [grasp.pose.position.x,
+                            grasp.pose.position.y, 
+                            grasp.pose.position.z,
+                            grasp.pose.orientation.x,
+                            grasp.pose.orientation.y,
+                            grasp.pose.orientation.z,
+                            grasp.pose.orientation.w]
 
             
+            if dataset_index % 100 == 0 or saveImages:
+                create_save_path(model_output_image_dir, model_name, index)
+                misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)
+
             dataset["rgbd_patches_temp"][dataset_index] = np.copy(rgbd_patches)
             dataset["rgbd_patch_labels_temp"][dataset_index] = grasp.energy
             dataset["rgbd_temp"][dataset_index] = np.copy(rgbd_image)
-            dataset["dof_values_temp"][dataset_index] = np.copy(grasp.dof_values[1:])
+            dataset["dof_values_temp"][dataset_index] = np.copy(grasp.dof_values)
+            dataset["palm_pose_temp"][dataset_index] = np.copy(grasp_pose_array)
+            dataset["joint_values_temp"][dataset_index] = np.copy(grasp.joint_angles)
             dataset["uvd_temp"][dataset_index] = vc_uvds
             dataset_index += 1
 
@@ -278,23 +330,25 @@ if __name__ == '__main__':
         if dataset_size < 10:
             chunk_size = dataset_size
 
-        dataset.create_dataset("rgbd", (dataset_size, 480, 640, 4), chunks=(chunk_size, 480, 640, 4))
-        dataset.create_dataset("rgbd_patches", (dataset_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4))
-        dataset.create_dataset("rgbd_patch_labels", (dataset_size, 1))
-        dataset.create_dataset("dof_values", (dataset_size, NUM_DOF), chunks=(chunk_size, NUM_DOF))
-        dataset.create_dataset("uvd", (dataset_size, NUM_RGBD_PATCHES_PER_IMAGE, 3), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 3))
-        for i in range(dataset_size):
-            dataset["rgbd"][i] = dataset["rgbd_temp"][i]
-            dataset["rgbd_patches"][i] = dataset["rgbd_patches_temp"][i]
-            dataset["rgbd_patch_labels"][i] = dataset["rgbd_patch_labels_temp"][i]
-            dataset["dof_values"][i] = dataset["dof_values_temp"][i]
-            dataset["uvd"][i] = dataset["uvd_temp"][i]
+        dataset_fullfilename = model_output_image_dir + "rgbd_and_labels.h5"
+        final_dataset = h5py.File(dataset_fullfilename)
 
-        del dataset["rgbd_temp"]
-        del dataset["rgbd_patches_temp"]
-        del dataset["rgbd_patch_labels_temp"]
-        del dataset["dof_values_temp"]
-        del dataset["uvd_temp"]
+        final_dataset.create_dataset("rgbd", (dataset_size, 480, 640, 4), chunks=(chunk_size, 480, 640, 4))
+        final_dataset.create_dataset("rgbd_patches", (dataset_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4))
+        final_dataset.create_dataset("rgbd_patch_labels", (dataset_size, 1))
+        final_dataset.create_dataset("dof_values", (dataset_size, NUM_DOF), chunks=(chunk_size, NUM_DOF))
+        final_dataset.create_dataset("palm_pose", (dataset_size, 7  ), chunks=(chunk_size, 7))
+        final_dataset.create_dataset("joint_values", (dataset_size, 8  ), chunks=(chunk_size, 8))
+        final_dataset.create_dataset("uvd", (dataset_size, NUM_RGBD_PATCHES_PER_IMAGE, 3), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 3))
+
+        for i in range(dataset_size):
+            final_dataset["rgbd"][i] = dataset["rgbd_temp"][i]
+            final_dataset["rgbd_patches"][i] = dataset["rgbd_patches_temp"][i]
+            final_dataset["rgbd_patch_labels"][i] = dataset["rgbd_patch_labels_temp"][i]
+            final_dataset["dof_values"][i] = dataset["dof_values_temp"][i]
+            final_dataset["palm_pose"][i] = dataset["palm_pose_temp"][i]
+            final_dataset["joint_values"][i] = dataset["joint_values_temp"][i]
+            final_dataset["uvd"][i] = dataset["uvd_temp"][i]
 
 
         model_manager.remove_model(model_name)

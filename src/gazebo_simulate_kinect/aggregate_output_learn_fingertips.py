@@ -37,7 +37,8 @@ NUM_DEPTH_BINS = 2
 GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
 
 #the directory we are going to pull all the h5 files from.
-INPUT_DIRECTORY = GDL_DATA_PATH + '/rgbd_images/2.0m-12_4_17_08'
+#INPUT_DIRECTORY = GDL_DATA_PATH + '/rgbd_images/2.0m-12_11_10_26'
+INPUT_DIRECTORY = '/media/Elements/gdl_data/rgbd_images/2.0m-12_11_11_13'
 
 OUT_DATASET_FILENAME = 'out.h5'
 OUT_CONDENSED_DATASET_FILENAME = 'out_condensed.h5'
@@ -59,6 +60,7 @@ def get_data_dimensions(subdirs):
     for subdir in subdirs:
 
         in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/rgbd_and_labels.h5"
+        print in_dataset_fullpath
         in_dataset = h5py.File(in_dataset_fullpath)
 
         num_patches += in_dataset['rgbd_patches'].shape[0]
@@ -80,7 +82,7 @@ def get_data_dimensions(subdirs):
 
 
 def get_histogram_for_dof_values(subdirs):
-    dof_values = np.zeros((num_images, 4))
+    dof_values = np.zeros((num_images, NUM_DOF))
 
     current = 0
     for subdir in subdirs:
@@ -119,16 +121,16 @@ def get_bin(data_point, bin_edges):
 
     #sanity check
     assert bin_id >= 0
-    assert bin_id < NUM_DOF_BINS
 
     return bin_id
 
 
 def get_num_grasp_types():
-    return math.pow(NUM_DOF_BINS, NUM_DOF) * NUM_DEPTH_BINS
+    wrist_roll_bins = np.arange(-math.pi, math.pi)
+    return math.pow(NUM_DOF_BINS, NUM_DOF) * NUM_DEPTH_BINS * len(wrist_roll_bins)
 
 
-def get_grasp_type(dof_values, dof_bin_edges_list, d):
+def get_grasp_type(dof_values, dof_bin_edges_list, d, wrist_roll):
 
     grasp_type = 0
 
@@ -146,7 +148,13 @@ def get_grasp_type(dof_values, dof_bin_edges_list, d):
     if d > .02:
         d_bin = 1
 
+
+    wrist_roll_bins = np.arange(-math.pi, math.pi)
+    wrist_roll_bin = get_bin(wrist_roll, wrist_roll_bins)
+
+
     grasp_type += d_bin * math.pow(NUM_DOF_BINS, NUM_DOF)
+    grasp_type += wrist_roll_bin * math.pow(NUM_DOF_BINS, NUM_DOF) * NUM_DEPTH_BINS
 
     return grasp_type
 
@@ -166,8 +174,8 @@ def init_out_dataset():
     images_chunk_size = tuple([10] + list(image_shape))
     uvd_chunk_size = (10, NUM_VC_OUT, 3)
     patch_labels_chunk_size = tuple([10, num_labels])
-    dof_values_chunk_size = (1000, NUM_DOF)
-    palm_to_object_offset_chunk_size = (1000, 1)
+    dof_values_chunk_size = (100, NUM_DOF)
+    palm_to_object_offset_chunk_size = (100, 1)
 
     #initialize the datasets
     out_dataset = h5py.File(OUT_DATASET_FILENAME)
@@ -177,9 +185,10 @@ def init_out_dataset():
     out_dataset.create_dataset("dof_values", dof_values_dataset_size, chunks=dof_values_chunk_size)
     out_dataset.create_dataset("uvd", uvd_dataset_size, chunks=uvd_chunk_size)
     out_dataset.create_dataset("palm_to_object_offset", palm_to_object_offset_dataset_size, chunks=palm_to_object_offset_chunk_size )
+    out_dataset.create_dataset("wrist_roll", palm_to_object_offset_dataset_size, chunks=palm_to_object_offset_chunk_size )
 
     #the id of the image that this patch comes from
-    out_dataset.create_dataset("patch_image_id", (num_patches*NUM_VC_OUT, 1), chunks=(1000, 1))
+    out_dataset.create_dataset("patch_image_id", (num_patches*NUM_VC_OUT, 1), chunks=(100, 1))
     #the id of the grasp type that this patch is for
     out_dataset.create_dataset("patch_grasp_type_id", (num_patches*NUM_VC_OUT, 1))
     #the id of the virtual contact that this patch is for
@@ -219,9 +228,10 @@ def build_dataset():
 
             u, v, d = in_dataset['uvd'][i][PALM_INDEX]
             out_dataset['palm_to_object_offset'][image_count] = in_dataset['rgbd'][i, u, v, 3] - d
+            out_dataset['wrist_roll'][image_count] = in_dataset['wrist_roll'][i]
 
             #the id of the grasp type
-            grasp_type_id = get_grasp_type(in_dataset['dof_values'][i], bin_edges_list, d)
+            grasp_type_id = get_grasp_type(in_dataset['dof_values'][i], bin_edges_list, d, in_dataset['wrist_roll'][i])
 
             for j in range(num_heatmaps_per_patch):
                 if j in VC_INDICES:
@@ -247,7 +257,7 @@ def build_dataset():
 #this will remove lots of the labels that do not actually correspond to feasible grasps.
 def condense_dataset():
 
-    threshold = 250
+    threshold = 400
 
     grasp_types = out_dataset['patch_grasp_type_id'][:]
 
@@ -280,14 +290,15 @@ def condense_dataset():
 
     condensed_dataset = h5py.File(OUT_CONDENSED_DATASET_FILENAME)
     condensed_dataset.create_dataset('rgbd_patches', (num_condensed_patches, patch_shape[0], patch_shape[1], patch_shape[2]), chunks=(10, patch_shape[0], patch_shape[1], patch_shape[2]))
-    condensed_dataset.create_dataset('rgbd_patch_labels', (num_condensed_patches, num_condensed_labels), chunks=(1000, num_condensed_labels))
-    condensed_dataset.create_dataset('grasp_type_id', (num_condensed_patches, num_condensed_grasp_types), chunks=(1000, num_condensed_grasp_types))
-    condensed_dataset.create_dataset('vc_id', (num_condensed_patches, NUM_VC_OUT), chunks=(1000, NUM_VC_OUT))
+    condensed_dataset.create_dataset('rgbd_patch_labels', (num_condensed_patches, num_condensed_labels), chunks=(100, num_condensed_labels))
+    condensed_dataset.create_dataset('grasp_type_id', (num_condensed_patches, 1), chunks=(100, 1))
+    condensed_dataset.create_dataset('vc_id', (num_condensed_patches, NUM_VC_OUT), chunks=(100, NUM_VC_OUT))
 
     
-    condensed_dataset.create_dataset('dof_values', (num_condensed_patches, NUM_DOF), chunks=(1000, NUM_DOF))
-    condensed_dataset.create_dataset('uvd', (num_condensed_patches, NUM_VC_OUT, 3), chunks=(1000, NUM_VC_OUT, 3))
-    condensed_dataset.create_dataset('palm_to_object_offset', (num_condensed_patches, 1), chunks=(1000, 1))
+    condensed_dataset.create_dataset('dof_values', (num_condensed_patches, NUM_DOF), chunks=(100, NUM_DOF))
+    condensed_dataset.create_dataset('uvd', (num_condensed_patches, NUM_VC_OUT, 3), chunks=(100, NUM_VC_OUT, 3))
+    condensed_dataset.create_dataset('palm_to_object_offset', (num_condensed_patches, 1), chunks=(100, 1))
+    condensed_dataset.create_dataset('wrist_roll', (num_condensed_patches, 1), chunks=(100, 1))
 
     current_index = 0
     for i in range(grasp_types.shape[0]):
@@ -314,6 +325,7 @@ def condense_dataset():
             condensed_dataset['dof_values'][current_index] = out_dataset['dof_values'][image_id]
             condensed_dataset['uvd'][current_index] = out_dataset['uvd'][image_id]
             condensed_dataset['palm_to_object_offset'][current_index] = out_dataset['palm_to_object_offset'][image_id]
+            condensed_dataset['wrist_roll'][current_index] = out_dataset['wrist_roll'][image_id]
 
             current_index += 1
 

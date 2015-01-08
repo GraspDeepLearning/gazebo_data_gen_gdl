@@ -72,7 +72,7 @@ def graspfilepath_to_grasps(graspfilepath):
 
             #check if we are finished
             if len(vc_array) != 3:
-                grasps.append(Grasp(energy, joint_angles, dof_values, pose, virtual_contacts))
+                grasps.append(Grasp(energy, joint_angles, dof_values[1:], pose, virtual_contacts))
                 reading_vcs = False
                 virtual_contacts = []
 

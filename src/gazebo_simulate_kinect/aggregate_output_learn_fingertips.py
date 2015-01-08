@@ -33,6 +33,9 @@ NUM_DOF_BINS = 4
 #two bins, for touching or not touching palm to object
 NUM_DEPTH_BINS = 2
 
+#number of joints for the hand
+NUM_JOINTS = 8
+
 #the root data directory
 GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
 
@@ -167,6 +170,7 @@ def init_out_dataset():
     uvd_dataset_size = [num_images, NUM_VC_OUT, 3]
     patch_labels_dataset_size = [num_patches*NUM_VC_OUT, num_labels]
     dof_values_dataset_size = [num_images, NUM_DOF]
+    joint_values_dataset_size = [num_images, NUM_JOINTS]
     palm_to_object_offset_dataset_size = [num_images, 1]
 
     #determine the size of a chunk for each dataset
@@ -174,8 +178,10 @@ def init_out_dataset():
     images_chunk_size = tuple([10] + list(image_shape))
     uvd_chunk_size = (10, NUM_VC_OUT, 3)
     patch_labels_chunk_size = tuple([10, num_labels])
-    dof_values_chunk_size = (100, NUM_DOF)
+    dof_values_chunk_size = (1000, NUM_DOF)
+    joint_values_chunk_size = (1000, NUM_JOINTS)
     palm_to_object_offset_chunk_size = (100, 1)
+
 
     #initialize the datasets
     out_dataset = h5py.File(OUT_DATASET_FILENAME)
@@ -183,6 +189,7 @@ def init_out_dataset():
     out_dataset.create_dataset("rgbd",  images_dataset_size, chunks=images_chunk_size)
     out_dataset.create_dataset("rgbd_patch_labels",  patch_labels_dataset_size, chunks=patch_labels_chunk_size)
     out_dataset.create_dataset("dof_values", dof_values_dataset_size, chunks=dof_values_chunk_size)
+    out_dataset.create_dataset("joint_values", joint_values_dataset_size, chunks=joint_values_chunk_size)
     out_dataset.create_dataset("uvd", uvd_dataset_size, chunks=uvd_chunk_size)
     out_dataset.create_dataset("palm_to_object_offset", palm_to_object_offset_dataset_size, chunks=palm_to_object_offset_chunk_size )
     out_dataset.create_dataset("wrist_roll", palm_to_object_offset_dataset_size, chunks=palm_to_object_offset_chunk_size )
@@ -225,6 +232,7 @@ def build_dataset():
             out_dataset['rgbd'][image_count] = in_dataset['rgbd'][i]
             out_dataset['uvd'][image_count] = in_dataset['uvd'][i][uvd_selector > 0]
             out_dataset['dof_values'][image_count] = in_dataset['dof_values'][i]
+            out_dataset['joint_values'][image_count] = in_dataset['joint_values'][i]
 
             u, v, d = in_dataset['uvd'][i][PALM_INDEX]
             out_dataset['palm_to_object_offset'][image_count] = in_dataset['rgbd'][i, u, v, 3] - d
@@ -295,10 +303,13 @@ def condense_dataset():
     condensed_dataset.create_dataset('vc_id', (num_condensed_patches, NUM_VC_OUT), chunks=(100, NUM_VC_OUT))
 
     
+
     condensed_dataset.create_dataset('dof_values', (num_condensed_patches, NUM_DOF), chunks=(100, NUM_DOF))
+    condensed_dataset.create_dataset('joint_values', (num_condensed_patches, NUM_JOINTS), chunks=(1000, NUM_JOINTS))
     condensed_dataset.create_dataset('uvd', (num_condensed_patches, NUM_VC_OUT, 3), chunks=(100, NUM_VC_OUT, 3))
     condensed_dataset.create_dataset('palm_to_object_offset', (num_condensed_patches, 1), chunks=(100, 1))
     condensed_dataset.create_dataset('wrist_roll', (num_condensed_patches, 1), chunks=(100, 1))
+
 
     current_index = 0
     for i in range(grasp_types.shape[0]):
@@ -323,6 +334,7 @@ def condense_dataset():
 
             image_id =  out_dataset['patch_image_id'][i][0]
             condensed_dataset['dof_values'][current_index] = out_dataset['dof_values'][image_id]
+            condensed_dataset['joint_values'][current_index] = out_dataset['joint_values'][image_id]
             condensed_dataset['uvd'][current_index] = out_dataset['uvd'][image_id]
             condensed_dataset['palm_to_object_offset'][current_index] = out_dataset['palm_to_object_offset'][image_id]
             condensed_dataset['wrist_roll'][current_index] = out_dataset['wrist_roll'][image_id]

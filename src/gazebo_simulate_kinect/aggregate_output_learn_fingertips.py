@@ -3,6 +3,9 @@ import os
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import grasp_priors
+import create_priors
+import build_grasp_prototypes
 
 #the number of virtual contacts collected
 NUM_VC_IN = 8
@@ -43,9 +46,16 @@ GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
 #INPUT_DIRECTORY = GDL_DATA_PATH + '/rgbd_images/2.0m-12_11_10_26'
 INPUT_DIRECTORY = '/media/Elements/gdl_data/rgbd_images/2.0m-12_11_11_13'
 
-OUT_DATASET_FILENAME = 'out.h5'
-OUT_CONDENSED_DATASET_FILENAME = 'out_condensed.h5'
-OUT_TEST_IMAGES_FILENAME = 'test_images.h5'
+import time
+current_time = str(int(time.time()))
+OUT_DIRECTORY_PATH = "out/" + current_time + '/'
+os.mkdir(OUT_DIRECTORY_PATH)
+
+OUT_DATASET_FILENAME = OUT_DIRECTORY_PATH + 'out.h5'
+OUT_CONDENSED_DATASET_FILENAME = OUT_DIRECTORY_PATH + 'out_condensed.h5'
+OUT_TEST_IMAGES_FILENAME = OUT_DIRECTORY_PATH + 'test_images.h5'
+OUT_HEATMAP_PRIORS_DATASET_FILENAME = OUT_DIRECTORY_PATH + "priors.h5"
+OUT_GRASP_PRIORS_LIST_FILENAME = OUT_DIRECTORY_PATH + "grasp_priors_list.pkl"
 
 
 #quickly run throught the directories and determine the shape of the patches
@@ -364,6 +374,12 @@ if __name__ == '__main__':
         out_dataset = h5py.File(OUT_DATASET_FILENAME)
 
     condense_dataset()
+
+    heatmaps_priors_generator = create_priors.HeatmapPriorsGenerator(OUT_CONDENSED_DATASET_FILENAME, OUT_HEATMAP_PRIORS_DATASET_FILENAME)
+    heatmaps_priors_generator.run()
+
+    gpl_generator = build_grasp_prototypes.GraspPriorListGen(OUT_CONDENSED_DATASET_FILENAME, OUT_GRASP_PRIORS_LIST_FILENAME)
+    gpl_generator.run()
 
     import IPython
     IPython.embed()

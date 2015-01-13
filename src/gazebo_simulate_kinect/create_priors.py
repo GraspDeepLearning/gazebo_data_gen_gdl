@@ -1,66 +1,8 @@
 import h5py
-import numpy as np
 import matplotlib.pyplot as plt
 import scipy.ndimage
-import os
-
-#dataset = h5py.File(os.path.expanduser('~/grasp_deep_learning/data/unprocessed_training_data/gdl_7vc.h5'))
-dataset = h5py.File('out_condensed.h5')
-priors_dataset = h5py.File('priors.h5')
-
-NUM_GRASP_TYPES = dataset['grasp_type_id'][:].max()+1
-NUM_VC = dataset['uvd'].shape[1]
-
-#the number of patches we have
-NUM_PATCHES = dataset['grasp_type_id'].shape[0]
-
-X_DIM = 480
-Y_DIM = 640
-
-priors_dataset.create_dataset('priors',
-                              (NUM_GRASP_TYPES, NUM_VC, NUM_VC, X_DIM, Y_DIM),
-                              chunks=(1, NUM_VC, NUM_VC, X_DIM, Y_DIM))
-
-priors = priors_dataset['priors']
-
-print "Building Priors"
-for index in range(NUM_PATCHES):
-    print index
-
-    #the set of uvds for a grasp
-    uvds = dataset['uvd'][index]
-    #the label for that grasp
-    grasp_type_id = dataset['grasp_type_id'][index][0]
-    print "grasp_type_id: " + str(grasp_type_id)
-
-    for i in range(NUM_VC):
-        for j in range(NUM_VC):
-
-            u0, v0, d0 = uvds[i]
-            u1, v1, d1 = uvds[j]
-
-            offset_u = u1-u0
-            offset_v = v1-v0
-
-            # import IPython
-            # IPython.embed()
-            # assert False
-
-            priors[grasp_type_id, i, j, X_DIM/2.0+offset_u, Y_DIM/2.0+offset_v] += 1
-
-print "Blurring Priors"
-for index in range(int(NUM_GRASP_TYPES)):
-    for i in range(NUM_VC):
-        for j in range(NUM_VC):
-            # import IPython
-            # IPython.embed()
-            # assert False
-
-            priors[index, i, j] = scipy.ndimage.gaussian_filter(priors[index, i, j], sigma=3)
 
 
-##################################################################################
-#3added to plot priors
 import math
 class format_subplot():
 
@@ -117,14 +59,79 @@ class Plotter():
         plt.show()
 
 
-plotter = Plotter()
+class HeatmapPriorsGenerator():
 
-for i in range(int(NUM_GRASP_TYPES)):
-    for j in range(NUM_VC):
-        for k in range(NUM_VC):
-            plotter.add_subplot(str(i) + "_" +str(j) + "_" +str(k), priors[i,j, k])
+    def __init__(self, in_filename="out_condensed.h5", out_filename='priors.h5'):
 
-plotter.show()
+        self.in_filename = in_filename
+        self.out_filename = out_filename
 
-import IPython
-IPython.embed()
+    def run(self):
+
+        #dataset = h5py.File(os.path.expanduser('~/grasp_deep_learning/data/unprocessed_training_data/gdl_7vc.h5'))
+        dataset = h5py.File(self.in_filename)
+        priors_dataset = h5py.File(self.out_filename)
+
+        NUM_GRASP_TYPES = dataset['grasp_type_id'][:].max()+1
+        NUM_VC = dataset['uvd'].shape[1]
+
+        #the number of patches we have
+        NUM_PATCHES = dataset['grasp_type_id'].shape[0]
+
+        X_DIM = 480
+        Y_DIM = 640
+
+        priors_dataset.create_dataset('priors',
+                                      (NUM_GRASP_TYPES, NUM_VC, NUM_VC, X_DIM, Y_DIM),
+                                      chunks=(1, NUM_VC, NUM_VC, X_DIM, Y_DIM))
+
+        priors = priors_dataset['priors']
+
+        print "Building Priors"
+        for index in range(NUM_PATCHES):
+            print index
+
+            #the set of uvds for a grasp
+            uvds = dataset['uvd'][index]
+            #the label for that grasp
+            grasp_type_id = dataset['grasp_type_id'][index][0]
+            print "grasp_type_id: " + str(grasp_type_id)
+
+            for i in range(NUM_VC):
+                for j in range(NUM_VC):
+
+                    u0, v0, d0 = uvds[i]
+                    u1, v1, d1 = uvds[j]
+
+                    offset_u = u1-u0
+                    offset_v = v1-v0
+
+                    priors[grasp_type_id, i, j, X_DIM/2.0+offset_u, Y_DIM/2.0+offset_v] += 1
+
+        print "Blurring Priors"
+        for index in range(int(NUM_GRASP_TYPES)):
+            for i in range(NUM_VC):
+                for j in range(NUM_VC):
+
+                    priors[index, i, j] = scipy.ndimage.gaussian_filter(priors[index, i, j], sigma=3)
+
+
+        ##################################################################################
+        #3added to plot priors
+
+
+
+        # plotter = Plotter()
+        #
+        # for i in range(int(NUM_GRASP_TYPES)):
+        #     for j in range(NUM_VC):
+        #         for k in range(NUM_VC):
+        #             plotter.add_subplot(str(i) + "_" +str(j) + "_" +str(k), priors[i,j, k])
+        #
+        # plotter.show()
+
+
+if __name__ == "__main__":
+
+    heatmap_prior_generator = HeatmapPriorsGenerator()
+    heatmap_prior_generator.run()

@@ -20,3 +20,4 @@ class GraspPrior():
         self.dof_values = []
         self.wrist_roll = 0.0
         self.uvd = 0, 0, 0
+        self.palm_backoff

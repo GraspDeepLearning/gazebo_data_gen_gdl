@@ -1,0 +1,31 @@
+rgbd:
+    max_shape: [null, 480, 640, 4]
+    chunk_shape: [50, 480, 640, 4]
+
+rgbd_patches:
+    max_shape: [null, 4, 170, 170, 4]
+    chunk_shape: [50, 4, 170, 170, 4]
+
+rgbd_patch_labels:
+    max_shape: [null, 4, 72]
+    chunk_shape: [50, 4, 72]
+
+dof_values:
+    max_shape: [null, 4]
+    chunk_shape: [50, 4]
+
+palm_pose:
+    max_shape: [null, 7]
+    chunk_shape: [50, 7]
+
+joint_values:
+    max_shape: [null, 8]
+    chunk_shape: [50, 8]
+
+uvd:
+    max_shape: [null, 3]
+    chunk_shape: [50, 3]
+
+wrist_roll:
+    max_shape: [null, 1]
+    chunk_shape: [50, 1]

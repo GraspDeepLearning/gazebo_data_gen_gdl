@@ -55,8 +55,6 @@ def build_camera_pose_in_grasp_frame(grasp, cameraDist):
     # rotate so that camera is upright.
     yaw = 0#-math.pi/2.0 + grasp.joint_angles[0]
 
-
-
     # #rotation matrix from grasp to model rather than model to grasp.
     # quaternion_inverse = tf.transformations.quaternion_inverse(*grasp.pose.orientation)
     # q= quaternion_inverse

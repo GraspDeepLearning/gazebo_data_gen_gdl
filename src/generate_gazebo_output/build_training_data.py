@@ -298,6 +298,11 @@ if __name__ == '__main__':
             #this is a processed rgbd_image that has been normalized and any nans have been removed
             rgbd_image = np.copy(kinect_manager.get_normalized_rgbd_image())
 
+            # Sometimes for no real reason openni fails and the depths stop being published.
+            if rgbd_image[:, :, 3].max() == 0.0:
+                print "SOMETHING'S BROKEN!"
+                import IPython; IPython.embed()
+
             rgbd_patches, grasp_points, overlay = fill_images_with_grasp_points(vc_uvds, grasp, rgbd_image)
 
             grasp_pose_array = [grasp.pose.position.x,
@@ -312,9 +317,16 @@ if __name__ == '__main__':
             if dataset_index % 100 == 0 or saveImages:
                 create_save_path(model_output_image_dir, model_name, index)
                 misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)
+                misc.imsave(model_output_image_dir + "overlays" + "/" + 'depth' + str(index) + '.png', rgbd_image[:, :, 3])
 
             dataset["rgbd_patches_temp"][dataset_index] = np.copy(rgbd_patches)
             dataset["rgbd_patch_labels_temp"][dataset_index] = grasp.energy
+
+            # Sometimes for no real reason openni fails and the depths stop being published.
+            if rgbd_image[:, :, 3].max() == 0.0:
+                print "SOMETHING'S BROKEN!"
+                import IPython; IPython.embed()
+
             dataset["rgbd_temp"][dataset_index] = np.copy(rgbd_image)
             dataset["dof_values_temp"][dataset_index] = np.copy(grasp.dof_values)
             dataset["palm_pose_temp"][dataset_index] = np.copy(grasp_pose_array)
@@ -355,5 +367,6 @@ if __name__ == '__main__':
             final_dataset["uvd"][i] = dataset["uvd_temp"][i]
             final_dataset["wrist_roll"][i] = dataset["wrist_roll"][i]
 
-
+        dataset.close()
+        final_dataset.close()
         model_manager.remove_model(model_name)

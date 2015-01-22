@@ -25,6 +25,7 @@ class GraspPriorListGen():
         wrist_roll = dset['wrist_roll']
         uvd = dset['uvd']
         joint_values = dset['joint_values']
+        palm_backoff = dset['palm_to_object_offset']
 
         num_grasp_types = np.max(dset['grasp_type_id']) + 1
         grasp_types_count = np.zeros(num_grasp_types)
@@ -33,6 +34,7 @@ class GraspPriorListGen():
         avg_wrist_roll= np.zeros((num_grasp_types, 1))
         avg_uvd = np.zeros((num_grasp_types, 4, 3))
         avg_joint_values = np.zeros((num_grasp_types, 8))
+        avg_palm_backoff = np.zeros((num_grasp_types, 1))
 
         for i in range(len(dset["grasp_type_id"])):
 
@@ -43,12 +45,14 @@ class GraspPriorListGen():
             avg_wrist_roll[grasp_type] += wrist_roll[i]
             avg_uvd[grasp_type] += uvd[i]
             avg_joint_values[grasp_type] += joint_values[i]
+            avg_palm_backoff[grasp_type] += palm_backoff[i]
 
         for i in range(len(grasp_types_count)):
             avg_dof[i]/=grasp_types_count[i]
             avg_wrist_roll[i]/=grasp_types_count[i]
             avg_uvd[i]/=grasp_types_count[i]
             avg_joint_values[i]/=grasp_types_count[i]
+            avg_palm_backoff[i]/=grasp_types_count[i]
 
         grasp_priors_list = GraspPriorsList()
 
@@ -59,6 +63,7 @@ class GraspPriorListGen():
             grasp_prior.wrist_roll = avg_wrist_roll[i]
             grasp_prior.uvd = avg_uvd[i]
             grasp_prior.joint_values = avg_joint_values[i]
+            grasp_prior.palm_backoff = avg_palm_backoff[i]
 
             grasp_priors_list.add_grasp_prior(grasp_prior)
 

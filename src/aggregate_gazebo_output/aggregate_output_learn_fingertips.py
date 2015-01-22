@@ -44,11 +44,13 @@ GDL_DATA_PATH = os.environ["GDL_PATH"] + "/data"
 
 #the directory we are going to pull all the h5 files from.
 #INPUT_DIRECTORY = GDL_DATA_PATH + '/rgbd_images/2.0m-12_11_10_26'
-INPUT_DIRECTORY = '/media/Elements/gdl_data/rgbd_images/2.0m-12_11_11_13'
+INPUT_DIRECTORY = '/media/Elements/gdl_data/rgbd_images/2.0m-1_15_14_36'
 
 import time
 current_time = str(int(time.time()))
-OUT_DIRECTORY_PATH = "out/" + current_time + '/'
+#OUT_DIRECTORY_PATH = "out/" + current_time + '/'
+OUT_DIRECTORY_PATH = "/media/Elements/gdl_data/aggregated_post_gazebo_grasps/" + current_time + '/'
+#OUT_DIRECTORY_PATH = "out/1421088946/"
 os.mkdir(OUT_DIRECTORY_PATH)
 
 OUT_DATASET_FILENAME = OUT_DIRECTORY_PATH + 'out.h5'
@@ -75,6 +77,9 @@ def get_data_dimensions(subdirs):
         in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/rgbd_and_labels.h5"
         print in_dataset_fullpath
         in_dataset = h5py.File(in_dataset_fullpath)
+
+        if 'rgbd_patches' not in in_dataset.keys():
+            continue
 
         num_patches += in_dataset['rgbd_patches'].shape[0]
         num_images += in_dataset['rgbd'].shape[0]
@@ -103,6 +108,9 @@ def get_histogram_for_dof_values(subdirs):
         in_dataset_fullpath = INPUT_DIRECTORY + '/' + subdir + "/rgbd_and_labels.h5"
         print in_dataset_fullpath
         in_dataset = h5py.File(in_dataset_fullpath)
+
+        if 'dof_values' not in in_dataset.keys():
+            continue
 
         for i in range(in_dataset['dof_values'].shape[0]):
             dof_values[current] = np.copy(in_dataset['dof_values'][i])
@@ -237,6 +245,9 @@ def build_dataset():
 
         print in_dataset_fullpath
 
+        if 'rgbd_patches' not in in_dataset.keys():
+            continue
+
         for i in range(in_dataset['rgbd_patches'].shape[0]):
 
             out_dataset['rgbd'][image_count] = in_dataset['rgbd'][i]
@@ -362,16 +373,16 @@ if __name__ == '__main__':
 
     subdirs = os.listdir(INPUT_DIRECTORY)
 
-    # #quickly run through the input directory to determine the values for several variables
+    #quickly run through the input directory to determine the values for several variables
     num_images, num_patches, image_shape, patch_shape, num_heatmaps_per_patch = get_data_dimensions(subdirs)
 
     num_grasp_types = get_num_grasp_types()
     num_labels = num_grasp_types*NUM_VC_OUT
 
     if not os.path.exists(OUT_DATASET_FILENAME):
-        out_dataset = build_dataset()
+       out_dataset = build_dataset()
     else:
-        out_dataset = h5py.File(OUT_DATASET_FILENAME)
+       out_dataset = h5py.File(OUT_DATASET_FILENAME)
 
     condense_dataset()
 

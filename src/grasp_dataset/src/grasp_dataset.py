@@ -5,7 +5,7 @@ from collections import namedtuple
 
 class GraspDataset():
 
-    def __init__(self, dset_full_filepath, dset_config_full_filepath):
+    def __init__(self, dset_full_filepath, dset_config_full_filepath=None):
         self.dset_full_filepath = dset_full_filepath
         self.dset_config_full_filepath = dset_config_full_filepath
 

@@ -9,7 +9,7 @@
 
   <!-- We resume the logic in empty_world.launch, changing only the name of the world to be launched -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
-    <arg name="world_name" value="$(find gazebo_simulate_kinect)/worlds/kinect_and_table.world"/>
+    <arg name="world_name" value="$(find generate_gazebo_output)/worlds/kinect_and_table.world"/>
     <arg name="debug" value="$(arg debug)" />
     <arg name="gui" value="$(arg gui)" />
     <arg name="paused" value="$(arg paused)"/>
@@ -19,7 +19,7 @@
 
   <!-- Load the URDF into the ROS Parameter Server -->
   <param name="robot_description"
-	 command="$(find xacro)/xacro.py '$(find gazebo_simulate_kinect)/urdf/kinect.xacro'" />
+	 command="$(find xacro)/xacro.py '$(find generate_gazebo_output)/urdf/kinect.xacro'" />
 
 
 </launch>

@@ -7,25 +7,27 @@ from geometry_msgs.msg import Pose
 Grasp = namedtuple('Grasp', 'energy joint_angles dof_values pose virtual_contacts')
 
 
-def get_model_grasps(model_name):
+def get_model_grasps(graspfilepath, model_name, graspClass=None):
+
+    if graspClass is None:
+        graspClass = Grasp
 
     grasps = []
 
-    graspfilepath = os.path.expanduser(os.environ["GDL_GRASPS_PATH"] + "/" + model_name)
 
     if not os.path.exists(graspfilepath):
         print graspfilepath + " does not exist, skipping this object"
         return None
 
     for graspfile in os.listdir(graspfilepath):
-        new_grasps = graspfilepath_to_grasps(graspfilepath + "/" + graspfile)
+        new_grasps = graspfilepath_to_grasps(graspfilepath + "/" + graspfile, graspClass, model_name)
         for grasp in new_grasps:
             grasps.append(grasp)
 
     return grasps
 
 
-def graspfilepath_to_grasps(graspfilepath):
+def graspfilepath_to_grasps(graspfilepath, graspClass, model_name):
 
     grasps = []
 
@@ -72,7 +74,14 @@ def graspfilepath_to_grasps(graspfilepath):
 
             #check if we are finished
             if len(vc_array) != 3:
-                grasps.append(Grasp(energy, joint_angles, dof_values[1:], pose, virtual_contacts))
+                grasps.append(graspClass(joint_values=joint_angles,
+                                         dof_values=dof_values,
+                                         palm_pose=[pose.position.x, pose.position.y, pose.position.z, pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w],
+                                         virtual_contacts=virtual_contacts,
+                                         energy=energy,
+                                         model_name=model_name))
+
+
                 reading_vcs = False
                 virtual_contacts = []
 

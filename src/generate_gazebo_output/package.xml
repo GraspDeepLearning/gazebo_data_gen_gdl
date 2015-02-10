@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>gazebo_simulate_kinect</name>
+  <name>generate_gazebo_output</name>
   <version>0.0.0</version>
   <description>The gazebo_simulate_kinect package</description>
 

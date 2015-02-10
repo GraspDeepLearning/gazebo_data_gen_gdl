@@ -2,10 +2,10 @@
 
 
   <!-- Startup Gazebo -->
-  <include file="$(find gazebo_simulate_kinect)/launch/init_world.launch"/>
+  <include file="$(find generate_gazebo_output)/launch/init_world.launch"/>
 
   <!-- Collect synthetic data -->
- <node name="data_gen" pkg="gazebo_simulate_kinect" type="build_training_data.py" />
+  <!--<node name="data_gen" pkg="generate_gazebo_output" type="build_training_data2.py" />-->
 
 
 </launch>

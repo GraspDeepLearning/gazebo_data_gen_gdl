@@ -16,10 +16,10 @@ import h5py
 from gazebo_ros import gazebo_interface
 
 from src.gazebo_model_manager import GazeboKinectManager, GazeboModelManager
-from src.grasp import get_model_grasps
 from src.transformer_manager import TransformerManager
 from src.xyz_to_pixel_loc import xyz_to_uv
 import copy
+from grasp_dataset import GraspDataset
 
 rospack = rospkg.RosPack()
 
@@ -29,7 +29,7 @@ GDL_DATA_PATH = "/media/Elements/gdl_data"
 GDL_GRASPS_PATH = os.environ["GDL_GRASPS_PATH"]
 GDL_MODEL_PATH = os.environ["GDL_MODEL_PATH"] + "/big_bird_models_processed"
 
-NUM_VIRTUAL_CONTACTS = 7
+NUM_VIRTUAL_CONTACTS = 16
 
 #the +1 is for the center of the palm.
 NUM_RGBD_PATCHES_PER_IMAGE = NUM_VIRTUAL_CONTACTS + 1
@@ -74,7 +74,7 @@ def build_camera_pose_in_grasp_frame(grasp, cameraDist):
 
 
 
-def calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp, graspNum):
+def calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp):
     vc_uvds = []
 
     #this is the pixel location of the grasp point
@@ -130,13 +130,13 @@ def create_save_path(model_output_image_dir, model_name, index ):
     if not os.path.exists(model_output_image_dir + "overlays"):
         os.makedirs(model_output_image_dir + "overlays")
 
-def update_transforms(transform_manager, grasp, kinect_manager, cameraDist):
-    transform_manager.add_transform(grasp.pose, "Model", "Grasp")
+def update_transforms(transform_manager, grasp_pose, kinect_manager, cameraDist):
+    transform_manager.add_transform(grasp_pose, "Model", "Grasp")
 
-    camera_pose_in_grasp_frame = build_camera_pose_in_grasp_frame(grasp, cameraDist)
+    camera_pose_in_grasp_frame = build_camera_pose_in_grasp_frame(grasp_pose, cameraDist)
 
     camera_pose_in_world_frame = transform_manager.transform_pose(camera_pose_in_grasp_frame, "Grasp", "World")
-    grasp_pose_in_world_frame = transform_manager.transform_pose(grasp.pose, "Model", "World")
+    grasp_pose_in_world_frame = transform_manager.transform_pose(grasp_pose, "Model", "World")
 
     #look at these as two points in world coords, ignoring rotations
     dx = camera_pose_in_world_frame.pose.position.x - grasp_pose_in_world_frame.pose.position.x
@@ -217,26 +217,31 @@ if __name__ == '__main__':
     model_names = os.listdir(GDL_MODEL_PATH)
     firstTime = True
 
-    for model_name in os.listdir(GDL_GRASPS_PATH):
+    graspit_grasps_dir = os.path.expanduser("~/grasp_deep_learning/data/grasp_datasets/contact_and_potential_grasps/")
+    graspit_agg_dir = os.path.expanduser("~/grasp_deep_learning/data/grasp_datasets/")
 
-        grasps = get_model_grasps(model_name)
+    rospack = rospkg.RosPack()
+    DATASET_TEMPLATE_PATH = rospack.get_path('grasp_dataset')
+    graspit_grasp_dataset = GraspDataset(graspit_agg_dir + "contact_and_potential_grasps.h5",
+                                 DATASET_TEMPLATE_PATH + "/dataset_configs/graspit_grasps_dataset.yaml")
 
-        #do we have grasps for this model
-        if not grasps:
-            print str(model_name) + ' has no grasps'
-            continue
+    gazebo_grasp_dataset = GraspDataset(graspit_agg_dir + "gazebo_contact_and_potential_grasps" + get_date_string() + ".h5",
+                                        DATASET_TEMPLATE_PATH + "/dataset_configs/gazebo_capture_config.yaml")
+    numIter = 0
+    for grasp in graspit_grasp_dataset.random_iterator(num_items=51):
+        numIter += 1
+        model_name = grasp.model_name[0]
 
-        #do we actually have the model
-        if not model_name in model_names:
-            print 'we have grasps for ' + str(model_name) + ' but the model is not in the models directory'
-            continue
+        grasp_pose = Pose()
+        grasp_pose.position.x = grasp.palm_pose[0]
+        grasp_pose.position.y = grasp.palm_pose[1]
+        grasp_pose.position.z = grasp.palm_pose[2]
+        grasp_pose.orientation.x = grasp.palm_pose[3]
+        grasp_pose.orientation.y = grasp.palm_pose[4]
+        grasp_pose.orientation.z = grasp.palm_pose[5]
+        grasp_pose.orientation.w = grasp.palm_pose[6]
 
-        model_output_image_dir = output_image_dir + model_name + '/'
-        if not os.path.exists(model_output_image_dir):
-            os.makedirs(model_output_image_dir)
-
-        model_type = model_name
-        model_manager.spawn_model(model_name, model_type)
+        model_manager.spawn_model(model_name=model_name,  model_type=model_name)
 
         transform_manager = TransformerManager()
 
@@ -246,54 +251,25 @@ if __name__ == '__main__':
         model_pose_in_world_frame = model_manager.get_model_state(model_name).pose
         transform_manager.add_transform(model_pose_in_world_frame, "World", "Model")
 
-        dataset_fullfilename = model_output_image_dir + "rgbd_and_labels_temp.h5"
+        print "%s: Running %s..." % (numIter, model_name)
 
-        if os.path.isfile(dataset_fullfilename):
-            os.remove(dataset_fullfilename)
+        #break so that we can manually add lights to gazebo
+        # if firstTime:
+        #     import pdb; pdb.set_trace()
+        #     firstTime = False
 
-        dataset = h5py.File(dataset_fullfilename)
-        print "Dataset is at: %s" % (dataset_fullfilename)
+        updated_transforms, wrist_roll = update_transforms(transform_manager, grasp_pose, kinect_manager, cameraDist)
 
-        num_images = len(grasps)
-        #if num_images > 7:
-        #    num_images = 7
-
-        chunk_size = 10
-        if num_images < 10:
-            chunk_size = num_images
-
-        dataset.create_dataset("rgbd_temp", (num_images, 480, 640, 4), chunks=(chunk_size, 480, 640, 4))
-        dataset.create_dataset("rgbd_patches_temp", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4))
-        dataset.create_dataset("rgbd_patch_labels_temp", (num_images, 1))
-        dataset.create_dataset("dof_values_temp", (num_images, NUM_DOF), chunks=(chunk_size, NUM_DOF))
-        dataset.create_dataset("palm_pose_temp", (num_images, 7  ), chunks=(chunk_size, 7))
-        dataset.create_dataset("joint_values_temp", (num_images, 8  ), chunks=(chunk_size, 8))
-        dataset.create_dataset("uvd_temp", (num_images, NUM_RGBD_PATCHES_PER_IMAGE, 3), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 3))
-        dataset.create_dataset("wrist_roll", (num_images, 1))
-        dataset_index = 0
-
-        print "Running %s..." % model_name
-
-        for index in range(num_images):
-            if firstTime:
-                import pdb; pdb.set_trace()
-                firstTime = False
-
-            print "%s / %s grasps for %s" % (index, num_images, model_name)
-            grasp = grasps[index]
-
-            updated_transforms, wrist_roll = update_transforms(transform_manager, grasp, kinect_manager, cameraDist)
-            if not updated_transforms:
-                print "Camera below model... skipping this grasp"
-                continue
-                # go to next index if the camera is positioned below the object
-
-            grasp_in_camera_frame = transform_manager.transform_pose(grasp.pose, "Model", "Camera").pose
+        if not updated_transforms:
+            print "Camera below model... skipping this grasp"
+            # go to next index if the camera is positioned below the object
+        else:
+            grasp_in_camera_frame = transform_manager.transform_pose(grasp_pose, "Model", "Camera").pose
 
             #vc_uvs is a list of (u,v) tuples in the camera_frame representing:
             #1)the palm,
             #2)all the virtual contacts used in graspit
-            vc_uvds = calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp, index)
+            vc_uvds = calculate_palm_and_vc_image_locations(grasp_in_camera_frame, transform_manager, grasp)
 
             #this is a processed rgbd_image that has been normalized and any nans have been removed
             rgbd_image = np.copy(kinect_manager.get_normalized_rgbd_image())
@@ -303,70 +279,20 @@ if __name__ == '__main__':
                 print "SOMETHING'S BROKEN!"
                 import IPython; IPython.embed()
 
-            rgbd_patches, grasp_points, overlay = fill_images_with_grasp_points(vc_uvds, grasp, rgbd_image)
+            #rgbd_patches, grasp_points, overlay = fill_images_with_grasp_points(vc_uvds, grasp, rgbd_image)
 
-            grasp_pose_array = [grasp.pose.position.x,
-                            grasp.pose.position.y, 
-                            grasp.pose.position.z,
-                            grasp.pose.orientation.x,
-                            grasp.pose.orientation.y,
-                            grasp.pose.orientation.z,
-                            grasp.pose.orientation.w]
+            gazebo_grasp = gazebo_grasp_dataset.Grasp(
+                rgbd=rgbd_image,
+                dof_values=grasp.dof_values,
+                palm_pose=grasp.palm_pose,
+                joint_values=grasp.joint_values,
+                uvd=vc_uvds,
+                wrist_roll=wrist_roll,
+                virtual_contacts=grasp.virtual_contacts,
+                model_name=grasp.model_name,
+                energy=grasp.energy
+            )
 
-            
-            if dataset_index % 100 == 0 or saveImages:
-                create_save_path(model_output_image_dir, model_name, index)
-                misc.imsave(model_output_image_dir + "overlays" + "/" + 'overlay' + str(index) + '.png', overlay)
-                misc.imsave(model_output_image_dir + "overlays" + "/" + 'depth' + str(index) + '.png', rgbd_image[:, :, 3])
+            gazebo_grasp_dataset.add_grasp(gazebo_grasp)
 
-            dataset["rgbd_patches_temp"][dataset_index] = np.copy(rgbd_patches)
-            dataset["rgbd_patch_labels_temp"][dataset_index] = grasp.energy
-
-            # Sometimes for no real reason openni fails and the depths stop being published.
-            if rgbd_image[:, :, 3].max() == 0.0:
-                print "SOMETHING'S BROKEN!"
-                import IPython; IPython.embed()
-
-            dataset["rgbd_temp"][dataset_index] = np.copy(rgbd_image)
-            dataset["dof_values_temp"][dataset_index] = np.copy(grasp.dof_values)
-            dataset["palm_pose_temp"][dataset_index] = np.copy(grasp_pose_array)
-            dataset["joint_values_temp"][dataset_index] = np.copy(grasp.joint_angles)
-            dataset["uvd_temp"][dataset_index] = vc_uvds
-            dataset['wrist_roll'][dataset_index] = wrist_roll
-            dataset_index += 1
-
-            #for i in range(len(grasp.virtual_contacts)):
-            #   model_manager.remove_model("sphere-%s-%s" % (index, i))
-            #sleep(1)
-
-        dataset_size = dataset_index
-        chunk_size = 10    
-
-        if dataset_size < 10:
-            chunk_size = dataset_size
-
-        dataset_fullfilename = model_output_image_dir + "rgbd_and_labels.h5"
-        final_dataset = h5py.File(dataset_fullfilename)
-
-        final_dataset.create_dataset("rgbd", (dataset_size, 480, 640, 4), chunks=(chunk_size, 480, 640, 4))
-        final_dataset.create_dataset("rgbd_patches", (dataset_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, PATCH_SIZE, PATCH_SIZE, 4))
-        final_dataset.create_dataset("rgbd_patch_labels", (dataset_size, 1))
-        final_dataset.create_dataset("dof_values", (dataset_size, NUM_DOF), chunks=(chunk_size, NUM_DOF))
-        final_dataset.create_dataset("palm_pose", (dataset_size, 7  ), chunks=(chunk_size, 7))
-        final_dataset.create_dataset("joint_values", (dataset_size, 8  ), chunks=(chunk_size, 8))
-        final_dataset.create_dataset("uvd", (dataset_size, NUM_RGBD_PATCHES_PER_IMAGE, 3), chunks=(chunk_size, NUM_RGBD_PATCHES_PER_IMAGE, 3))
-        final_dataset.create_dataset("wrist_roll", (dataset_size, 1))
-
-        for i in range(dataset_size):
-            final_dataset["rgbd"][i] = dataset["rgbd_temp"][i]
-            final_dataset["rgbd_patches"][i] = dataset["rgbd_patches_temp"][i]
-            final_dataset["rgbd_patch_labels"][i] = dataset["rgbd_patch_labels_temp"][i]
-            final_dataset["dof_values"][i] = dataset["dof_values_temp"][i]
-            final_dataset["palm_pose"][i] = dataset["palm_pose_temp"][i]
-            final_dataset["joint_values"][i] = dataset["joint_values_temp"][i]
-            final_dataset["uvd"][i] = dataset["uvd_temp"][i]
-            final_dataset["wrist_roll"][i] = dataset["wrist_roll"][i]
-
-        dataset.close()
-        final_dataset.close()
         model_manager.remove_model(model_name)

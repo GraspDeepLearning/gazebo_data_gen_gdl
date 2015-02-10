@@ -2,17 +2,9 @@ rgbd:
     max_shape: [null, 480, 640, 4]
     chunk_shape: [50, 480, 640, 4]
 
-rgbd_patches:
-    max_shape: [null, 4, 170, 170, 4]
-    chunk_shape: [50, 4, 170, 170, 4]
-
-rgbd_patch_labels:
-    max_shape: [null, 4, 72]
-    chunk_shape: [50, 4, 72]
-
 dof_values:
-    max_shape: [null, 4]
-    chunk_shape: [50, 4]
+    max_shape: [null, 3]
+    chunk_shape: [50, 3]
 
 palm_pose:
     max_shape: [null, 7]
@@ -23,9 +15,22 @@ joint_values:
     chunk_shape: [50, 8]
 
 uvd:
-    max_shape: [null, 3]
-    chunk_shape: [50, 3]
+    max_shape: [null, 17, 3]
+    chunk_shape: [50, 17, 3]
 
 wrist_roll:
+    max_shape: [null, 1]
+    chunk_shape: [50, 1]
+
+virtual_contacts:
+    max_shape: [null, 16 , 3]
+    chunk_shape: [50, 16, 3]
+
+model_name:
+    dtype: String
+    max_shape: [null, 1]
+    chunk_shape: [50, 1]
+
+energy:
     max_shape: [null, 1]
     chunk_shape: [50, 1]

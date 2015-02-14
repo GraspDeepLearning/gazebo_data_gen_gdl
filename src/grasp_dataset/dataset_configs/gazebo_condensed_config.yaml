@@ -1,0 +1,40 @@
+rgbd:
+    max_shape: [null, 480, 640, 4]
+    chunk_shape: [50, 480, 640, 4]
+
+dof_values:
+    max_shape: [null, 3]
+    chunk_shape: [50, 3]
+
+palm_pose:
+    max_shape: [null, 7]
+    chunk_shape: [50, 7]
+
+joint_values:
+    max_shape: [null, 8]
+    chunk_shape: [50, 8]
+
+uvd:
+    max_shape: [null, 17, 3]
+    chunk_shape: [50, 17, 3]
+
+wrist_roll:
+    max_shape: [null, 1]
+    chunk_shape: [50, 1]
+
+virtual_contacts:
+    max_shape: [null, 16 , 3]
+    chunk_shape: [50, 16, 3]
+
+model_name:
+    dtype: String
+    max_shape: [null, 1]
+    chunk_shape: [50, 1]
+
+energy:
+    max_shape: [null, 1]
+    chunk_shape: [50, 1]
+
+grasp_type:
+    max_shape: [null, 1]
+    chunk_shape: [50, 1]

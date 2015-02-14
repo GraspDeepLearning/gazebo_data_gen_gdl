@@ -2,7 +2,7 @@ import h5py
 import yaml
 from collections import namedtuple
 import random
-
+import numpy as np
 
 class GraspDataset():
 
@@ -58,7 +58,7 @@ class GraspDataset():
         current_index = self.get_current_index()
         if current_index >= current_limit:
             for key in self.config.keys():
-                self.dset[key].resize(current_limit + 25, axis=0)
+                self.dset[key].resize(current_limit + 250, axis=0)
 
         for key in self.config.keys():
             self.dset[key][current_index] = grasp.__getattribute__(key)
@@ -81,8 +81,8 @@ class GraspDataset():
     def increment_current_index(self):
         self.dset['current_grasp_index'][0] += 1
 
-    def iterator(self):
-        return GraspIterator(self)
+    def iterator(self, start=None, end=None):
+        return GraspIterator(self, start, end)
 
     def random_iterator(self, num_items=None):
         return RandomGraspIterator(self, num_items)
@@ -90,9 +90,17 @@ class GraspDataset():
 
 class GraspIterator():
 
-    def __init__(self, dataset):
+    def __init__(self, dataset, start=None, end=None):
         self.dataset = dataset
         self.current_index = 0
+
+        if end:
+            self.end_index = end
+        else:
+            self.end_index = self.dataset.get_current_index()
+
+        if start:
+            self.current_index = start
 
     def __iter__(self):
         return self
@@ -100,7 +108,7 @@ class GraspIterator():
     def next(self):
 
         #we have iterated over all the grasps
-        if self.current_index >= self.dataset.get_current_index():
+        if self.current_index >= self.end_index:
             raise StopIteration()
 
         grasp = self.dataset.get_grasp(self.current_index)
@@ -117,6 +125,8 @@ class RandomGraspIterator():
         if num_items is None:
             num_items = self.dataset.get_current_index()
 
+        self.order = np.random.permutation(int(self.dataset.get_current_index()))
+
         self.num_items = num_items
 
         self.current_index = 0
@@ -129,9 +139,8 @@ class RandomGraspIterator():
         if self.current_index >= self.num_items:
             raise StopIteration()
 
-        index = random.randint(0, self.dataset.get_current_index())
         self.current_index += 1
 
-        return self.dataset.get_grasp(index)
+        return self.dataset.get_grasp(self.order[self.current_index])
 
 

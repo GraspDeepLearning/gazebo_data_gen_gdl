@@ -178,26 +178,41 @@ if __name__ == '__main__':
 
     DATASET_TEMPLATE_PATH = rospack.get_path('grasp_dataset')
 
-    graspit_agg_h5 = choose_from(graspit_agg_dir)[:-3]
-    graspit_grasp_dataset = GraspDataset(graspit_agg_dir + graspit_agg_h5,
+    graspit_grasp_dataset = GraspDataset(graspit_agg_dir + choose_from(graspit_agg_dir),
                                  DATASET_TEMPLATE_PATH + "/dataset_configs/graspit_grasps_dataset.yaml")
 
 
     gazebo_grasp_path = choose_from_or_none(gazebo_raw_dir)
     if not gazebo_grasp_path:
         # make a new dset
-        gazebo_grasp_path = gazebo_raw_dir + graspit_agg_h5 + "-" + get_date_string() + ".h5"
-        num_iter = 0
-    else:
-        num_iter = 1
+        gazebo_grasp_path = gazebo_raw_dir + "gazebo_contact_and_potential_grasps-" + get_date_string() + ".h5"
+    num_iter = 0
+
 
     gazebo_grasp_dataset = GraspDataset(gazebo_grasp_path,
                                         DATASET_TEMPLATE_PATH + "/dataset_configs/gazebo_capture_config.yaml")
-    if num_iter:
-        gazebo_grasp_dataset.get_current_index()
 
     model_name = None
+
+    prev_dset_offset = 0
+
+
+    current_object_count = 0
+    max_object_count = 60
+
+    current_object_model = None
     for grasp in graspit_grasp_dataset.iterator(start=num_iter):
+
+        if current_object_count < 0:
+            current_object_count += 1
+            continue
+
+        if current_object_count > max_object_count:
+            if grasp.model_name == current_object_model:
+                continue
+            else:
+                current_object_count = 0 - prev_dset_offset
+                current_object_model = None
 
         #if there is an old model, we need to remove it
         if model_name is not None and model_name != grasp.model_name[0]:
@@ -206,6 +221,8 @@ if __name__ == '__main__':
         #if there is no model, we need to spawn one.
         if model_name is None or model_name != grasp.model_name[0]:
             model_name = grasp.model_name[0]
+            if not current_object_model:
+                current_object_model = model_name
             model_manager.spawn_model(model_name=model_name,  model_type=model_name)
 
 
@@ -227,7 +244,7 @@ if __name__ == '__main__':
         model_pose_in_world_frame = model_manager.get_model_state(model_name).pose
         transform_manager.add_transform(model_pose_in_world_frame, "World", "Model")
 
-        print "%s: Running %s..." % (num_iter, model_name)
+        print "%s: Running %s... (%s/%s)" % (num_iter, model_name, current_object_count, max_object_count)
 
         #break so that we can manually add lights to gazebo
         if num_iter == 0:
@@ -268,6 +285,7 @@ if __name__ == '__main__':
             )
 
             gazebo_grasp_dataset.add_grasp(gazebo_grasp)
+            current_object_count += 1
 
 
         num_iter += 1

@@ -161,8 +161,10 @@ def update_transforms(transform_manager, grasp, kinect_manager, cameraDist):
     quaternion = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
 
     quat_grasp = camera_pose_in_world_frame.pose.orientation
+
     grasp_rpy =tf.transformations.euler_from_quaternion((quat_grasp.x, quat_grasp.y, quat_grasp.z, quat_grasp.w))
     camera_rpy = roll, pitch, yaw
+
 
     wrist_roll = grasp_rpy[0] - camera_rpy[0]
 

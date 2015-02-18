@@ -178,19 +178,18 @@ if __name__ == '__main__':
 
     DATASET_TEMPLATE_PATH = rospack.get_path('grasp_dataset')
 
-    graspit_agg_h5 = choose_from(graspit_agg_dir)[:-3]
+    graspit_agg_h5 = choose_from(graspit_agg_dir)
+    graspit_agg_name = graspit_agg_h5[:3]
     graspit_grasp_dataset = GraspDataset(graspit_agg_dir + graspit_agg_h5,
                                  DATASET_TEMPLATE_PATH + "/dataset_configs/graspit_grasps_dataset.yaml")
-
 
     gazebo_grasp_path = choose_from_or_none(gazebo_raw_dir)
     if not gazebo_grasp_path:
         # make a new dset
-        gazebo_grasp_path = gazebo_raw_dir + graspit_agg_h5 + "-" + get_date_string() + ".h5"
+        gazebo_grasp_path = gazebo_raw_dir + graspit_agg_name + "-" + get_date_string() + ".h5"
         num_iter = 0
     else:
         num_iter = 1
-
     gazebo_grasp_dataset = GraspDataset(gazebo_grasp_path,
                                         DATASET_TEMPLATE_PATH + "/dataset_configs/gazebo_capture_config.yaml")
     if num_iter:

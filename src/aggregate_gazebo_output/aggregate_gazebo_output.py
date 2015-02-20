@@ -48,30 +48,15 @@ def get_grasp_type(bin_values, bin_edges_list, num_entries_per_bin):
 #this will remove lots of the labels that do not actually correspond to feasible grasps.
 def condense_grasp_types(grasp_types, num_grasp_types):
 
-    target_num_grasp_types = NUM_CONDENSED_GRASP_TYPES
+    grasp_types_sorted = copy.copy(set(grasp_types))
+    grasp_types_sorted.sort()
+    grasp_types_sorted.reverse()
 
-    num_condensed_grasp_types = num_grasp_types
-    threshold = 1
+    threshold = grasp_types_sorted[NUM_CONDENSED_GRASP_TYPES - 1]
 
     counts = np.zeros(num_grasp_types)
-    count_mask = np.zeros(num_grasp_types) > threshold
-
-    while num_condensed_grasp_types > target_num_grasp_types:
-        print "working to get number of condensed grasp types to: " + str(target_num_grasp_types)
-        print "current threshold: " + str(threshold)
-        counts = np.zeros(num_grasp_types)
-
-        for grasp_type_id in grasp_types:
-                counts[grasp_type_id] += 1
-
-        count_mask = counts > threshold
-        threshold += 1
-
-        num_condensed_grasp_types = sum(count_mask)
-        print "num grasp types = " + str(num_condensed_grasp_types)
-
-    #this is the number of grasp types that we have more than threshold training examples of
-    print "number of grasps types above threshold: " + str(sum(count_mask))
+    for grasp_type_id in grasp_types:
+        counts[grasp_type_id] += 1
 
     grasp_type_to_condensed_grasp_type = {}
     current_condensed_grasp_id = 0

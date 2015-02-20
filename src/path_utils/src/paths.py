@@ -2,7 +2,6 @@
 import os
 import rospkg
 
-
 rospack = rospkg.RosPack()
 
 DATASET_TEMPLATE_PATH = rospack.get_path('grasp_dataset')

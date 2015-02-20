@@ -5,7 +5,7 @@
   <include file="$(find generate_gazebo_output)/launch/init_world.launch"/>
 
   <!-- Collect synthetic data -->
-  <!--<node name="data_gen" pkg="generate_gazebo_output" type="build_training_data2.py" />-->
+  <!--<node name="data_gen" pkg="generate_gazebo_output" type="build_training_data.py" />-->
 
 
 </launch>

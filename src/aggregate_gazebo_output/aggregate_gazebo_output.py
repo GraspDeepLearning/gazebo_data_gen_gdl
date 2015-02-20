@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import copy
 
 from grasp_dataset import GraspDataset
 from choose import choose_from
@@ -11,7 +12,7 @@ NUM_BINS_PER_JOINT = 5
 
 #helper function to determine what bin a data point belongs in.
 def get_bin(data_point, bin_edges):
-    bin_id = 0
+    bin_id = -1
     for bin_edge in bin_edges:
 
         #this will never pass on first bin_edge
@@ -20,15 +21,9 @@ def get_bin(data_point, bin_edges):
 
         bin_id += 1
 
-    bin_id -= 1
-
     #sanity check
-    if bin_id < 0 or bin_id >= len(bin_edges):
-        print "bad bin edge"
-        import IPython
-        IPython.embed()
     assert bin_id >= 0
-    assert bin_id < len(bin_edges)
+    assert bin_id < len(bin_edges) - 1
 
     return bin_id
 
@@ -57,6 +52,7 @@ def condense_grasp_types(grasp_types, num_grasp_types):
 
     num_condensed_grasp_types = num_grasp_types
     threshold = 1
+
     counts = np.zeros(num_grasp_types)
     count_mask = np.zeros(num_grasp_types) > threshold
 
@@ -66,11 +62,6 @@ def condense_grasp_types(grasp_types, num_grasp_types):
         counts = np.zeros(num_grasp_types)
 
         for grasp_type_id in grasp_types:
-                print grasp_type_id
-                if grasp_type_id > counts.shape[0]:
-                    print "error"
-                    import IPython
-                    IPython.embed()
                 counts[grasp_type_id] += 1
 
         count_mask = counts > threshold
@@ -103,16 +94,16 @@ if __name__ == "__main__":
                  'bhand/finger_3/med_joint',
                  'bhand/finger_3/dist_joint',
                  'wrist_roll']
-
-    bin_ranges = [(0,  math.pi),
-                  (0, 2.44),
-                  (0, .84),
-                  (0,  math.pi),
-                  (0, 2.44),
-                  (0, .84),
-                  (0, 2.44),
-                  (0, .84),
-                  (-math.pi, math.pi)]
+    slop = .01
+    bin_ranges = [(0,  math.pi + slop),
+                  (0, 2.44 + slop),
+                  (0, .84 + slop),
+                  (0,  math.pi + slop),
+                  (0, 2.44 + slop),
+                  (0, .84 + slop),
+                  (0, 2.44 + slop),
+                  (0, .84 + slop),
+                  (-math.pi - slop, math.pi + slop)]
 
     num_entries_per_bin = NUM_BINS_PER_JOINT
 

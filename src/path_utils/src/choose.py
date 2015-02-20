@@ -41,6 +41,7 @@ def choose_from(directory):
 
     return option
 
+
 def choose_from_or_none(directory):
 
     options = os.listdir(directory)

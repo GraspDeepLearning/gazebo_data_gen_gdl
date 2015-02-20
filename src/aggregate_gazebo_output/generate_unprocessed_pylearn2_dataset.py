@@ -1,10 +1,8 @@
-import math
-import numpy as np
-from grasp_dataset import GraspDataset
-import os
-import rospkg
-from paths import CONDENSED_GAZEBO_DIR, DATASET_TEMPLATE_PATH, RAW_PYLEARN_DIR
 import h5py
+
+from grasp_dataset import GraspDataset
+from paths import CONDENSED_GAZEBO_DIR, DATASET_TEMPLATE_PATH, RAW_PYLEARN_DIR
+from choose import choose_from
 
 PATCH_SIZE = 72
 VC_INDICES = [1, 8, 12, 16]

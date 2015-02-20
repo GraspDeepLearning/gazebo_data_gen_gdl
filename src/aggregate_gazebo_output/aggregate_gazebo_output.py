@@ -5,6 +5,10 @@ from grasp_dataset import GraspDataset
 from choose import choose_from
 from paths import CONDENSED_GAZEBO_DIR, RAW_GAZEBO_DIR, DATASET_TEMPLATE_PATH
 
+NUM_CONDENSED_GRASP_TYPES = 4
+NUM_BINS_PER_JOINT = 5
+
+
 #helper function to determine what bin a data point belongs in.
 def get_bin(data_point, bin_edges):
     bin_id = 0
@@ -19,7 +23,12 @@ def get_bin(data_point, bin_edges):
     bin_id -= 1
 
     #sanity check
+    if bin_id < 0 or bin_id >= len(bin_edges):
+        print "bad bin edge"
+        import IPython
+        IPython.embed()
     assert bin_id >= 0
+    assert bin_id < len(bin_edges)
 
     return bin_id
 
@@ -44,18 +53,24 @@ def get_grasp_type(bin_values, bin_edges_list, num_entries_per_bin):
 #this will remove lots of the labels that do not actually correspond to feasible grasps.
 def condense_grasp_types(grasp_types, num_grasp_types):
 
-    target_num_grasp_types = 5
+    target_num_grasp_types = NUM_CONDENSED_GRASP_TYPES
 
     num_condensed_grasp_types = num_grasp_types
     threshold = 1
-    counts = np.zeros(num_grasp_types + 1)
+    counts = np.zeros(num_grasp_types)
+    count_mask = np.zeros(num_grasp_types) > threshold
 
     while num_condensed_grasp_types > target_num_grasp_types:
         print "working to get number of condensed grasp types to: " + str(target_num_grasp_types)
         print "current threshold: " + str(threshold)
-        counts = np.zeros(num_grasp_types + 1)
+        counts = np.zeros(num_grasp_types)
 
         for grasp_type_id in grasp_types:
+                print grasp_type_id
+                if grasp_type_id > counts.shape[0]:
+                    print "error"
+                    import IPython
+                    IPython.embed()
                 counts[grasp_type_id] += 1
 
         count_mask = counts > threshold
@@ -89,17 +104,17 @@ if __name__ == "__main__":
                  'bhand/finger_3/dist_joint',
                  'wrist_roll']
 
-    bin_ranges = [(0, 3.14),
+    bin_ranges = [(0,  math.pi),
                   (0, 2.44),
                   (0, .84),
-                  (0, 3.14),
+                  (0,  math.pi),
                   (0, 2.44),
                   (0, .84),
                   (0, 2.44),
                   (0, .84),
                   (-math.pi, math.pi)]
 
-    num_entries_per_bin = 5
+    num_entries_per_bin = NUM_BINS_PER_JOINT
 
     num_grasp_types = math.pow(num_entries_per_bin, len(bin_ranges))
 
@@ -119,13 +134,23 @@ if __name__ == "__main__":
     condensed_gazebo_grasp_dataset = GraspDataset(condensed_gazebo_path,
                                                   DATASET_TEMPLATE_PATH + "/dataset_configs/gazebo_condensed_config.yaml")
 
+
+    count = 0
+
     grasp_types = []
+    print "Iterating through raw grasps"
     for grasp in gazebo_grasp_dataset.iterator():
+
+        if count % 500 == 0:
+            print str(count) + '/' + str(gazebo_grasp_dataset.get_current_index())
+
         bins = list(grasp.joint_values)
         bins.append(grasp.wrist_roll[0])
 
         grasp_type = get_grasp_type(bins, bin_edges, num_entries_per_bin)
         grasp_types.append(int(grasp_type))
+
+        count += 1
 
     grasp_type_to_condensed_grasp_type = condense_grasp_types(grasp_types, num_grasp_types)
 

@@ -6,6 +6,7 @@ from choose import choose_from
 
 PATCH_SIZE = 72
 VC_INDICES = [1, 8, 12, 16]
+NUM_PATCHES = len(VC_INDICES)
 
 
 def extract_patch(vc_uvd, rgbd_image):
@@ -25,23 +26,23 @@ if __name__ == "__main__":
 
     num_grasps = condensed_gazebo_grasp_dataset.get_current_index()
     num_grasp_types = condensed_gazebo_grasp_dataset.dset['grasp_type'][:].max() + 1
-    num_labels = num_grasp_types*4
+    num_labels = num_grasp_types*NUM_PATCHES
 
-    dset.create_dataset("rgbd_patches", shape=(num_grasps*4, PATCH_SIZE, PATCH_SIZE, 4), chunks=(10, PATCH_SIZE, PATCH_SIZE, 4))
-    dset.create_dataset("rgbd_patch_labels", shape=(num_grasps*4, num_labels), chunks=(10, num_labels))
+    dset.create_dataset("rgbd_patches", shape=(num_grasps*NUM_PATCHES, PATCH_SIZE, PATCH_SIZE, 4), chunks=(10, PATCH_SIZE, PATCH_SIZE, 4))
+    dset.create_dataset("rgbd_patch_labels", shape=(num_grasps*NUM_PATCHES, num_labels), chunks=(10, num_labels))
 
     for i in range(num_grasps):
         grasp = condensed_gazebo_grasp_dataset.get_grasp(i)
 
-        for j in range(4):
+        for j in range(NUM_PATCHES):
             vc_indice = VC_INDICES[j]
             uvd = grasp.uvd[vc_indice]
 
             patch = extract_patch(uvd, grasp.rgbd)
-            label = grasp.grasp_type*4 + j
+            label = grasp.grasp_type*NUM_PATCHES + j
 
-            dset['rgbd_patches'][i*4 + j] = patch
-            dset['rgbd_patch_labels'][i*4+j, label] = grasp.energy
+            dset['rgbd_patches'][i*NUM_PATCHES + j] = patch
+            dset['rgbd_patch_labels'][i*NUM_PATCHES+j, label] = grasp.energy
 
 
 

@@ -5,7 +5,6 @@ from geometry_msgs.msg import Pose
 import numpy as np
 import os
 from time import sleep
-import time
 import math
 import tf
 
@@ -201,7 +200,6 @@ if __name__ == '__main__':
         grasp_pose.orientation.y = grasp.palm_pose[4]
         grasp_pose.orientation.z = grasp.palm_pose[5]
         grasp_pose.orientation.w = grasp.palm_pose[6]
-
 
         transform_manager = TransformerManager()
 
